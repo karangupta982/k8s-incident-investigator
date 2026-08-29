@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Serena memory integrity after changes",
+      "description": "After each Kiro turn, locally check Serena memory references only when memory Markdown files changed. This does not invoke another agent.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "$HOME/.local/bin/kiro-memory-stop-check"
+      },
+      "enabled": true
+    }
+  ]
+}

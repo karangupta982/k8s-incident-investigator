@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Block prohibited shell operations",
+      "description": "Blocks Kiro from staging, committing, pushing, merging, destructive Git cleanup, and mutating infrastructure commands.",
+      "trigger": "PreToolUse",
+      "matcher": "shell",
+      "action": {
+        "type": "command",
+        "command": "$HOME/.local/bin/kiro-safety-guard"
+      },
+      "timeout": 5,
+      "enabled": true
+    }
+  ]
+}
