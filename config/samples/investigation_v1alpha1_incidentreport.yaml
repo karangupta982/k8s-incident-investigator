@@ -1,0 +1,18 @@
+# This is an example IncidentReport. In normal operation, IncidentReports are created
+# automatically by the controller when a workload failure is detected.
+# This sample can be used for testing or demonstration purposes.
+apiVersion: investigation.k8s.io/v1alpha1
+kind: IncidentReport
+metadata:
+  name: sample-incident-deployment-active
+  namespace: default
+  labels:
+    investigator.k8s.io/active: "true"
+    investigator.k8s.io/workload-name: sample-incident
+    investigator.k8s.io/workload-kind: Deployment
+    investigator.k8s.io/workload-namespace: default
+spec:
+  workload:
+    kind: Deployment
+    name: sample-incident
+    namespace: default
