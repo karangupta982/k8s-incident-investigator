@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animated Architecture Diagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0d;--line:#252525;--text:#f5f7fb;--muted:#969ba8;--blue:#3b82f6;--indigo:#6366f1;--green:#10b981;--amber:#f59e0b;--orange:#f97316;--teal:#14b8a6;--cyan:#06b6d4;--pink:#ec4899;--purple:#8b5cf6;--red:#ef4444}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Outfit,system-ui,sans-serif;min-height:100vh;background-image:radial-gradient(circle at 15% 0,rgba(59,130,246,.08),transparent 30rem),radial-gradient(circle at 92% 25%,rgba(139,92,246,.07),transparent 28rem)}
+button,input,select{font:inherit}button{color:inherit}
+
+/* TOP BAR */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:8px 20px;border-bottom:1px solid var(--line);background:rgba(13,13,13,.96);backdrop-filter:blur(18px);gap:12px}
+.topbar h1{margin:0;font-size:14px;font-weight:700;color:#dbeafe;white-space:nowrap}
+.controlbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flow-btn,.small-btn{border:1px solid #2d2d2d;background:#171717;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:11px;font-weight:600;transition:.2s;color:#c9cdd5}
+.flow-btn:hover,.small-btn:hover{border-color:#4b5563;background:#3c3434}
+.flow-btn.active{color:#fff;border-color:#3b82f6;background:#172554;box-shadow:0 0 18px rgba(59,130,246,.16)}
+.speed{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px}
+.speed select{color:#d6dae2;background:#171717;border:1px solid #303030;border-radius:8px;padding:6px}
+
+/* CANVAS */
+.canvas-shell{position:relative;overflow:auto;padding:10px}
+.canvas-wrap{position:relative;margin:auto;width:min(100%,1000px);aspect-ratio:10/12;min-width:720px}
+.canvas-wrap canvas{display:block;width:100%;height:100%;border-radius:13px;background:#0b0b0b}
+.canvas-badge{position:absolute;top:14px;left:16px;padding:6px 9px;border:1px solid #293244;border-radius:8px;background:rgba(13,13,13,.86);font:500 10px 'JetBrains Mono',monospace;color:#8fa3bf;pointer-events:none}
+.legend{position:absolute;bottom:14px;left:16px;display:flex;gap:12px;padding:8px 10px;border:1px solid #252525;border-radius:9px;background:rgba(13,13,13,.9);font-size:10px;color:#9ca3af;pointer-events:none}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
+
+/* TOOLTIP */
+.tooltip{position:fixed;z-index:80;display:none;width:320px;padding:15px;border:1px solid #32343b;border-radius:12px;background:rgba(13,13,13,.97);box-shadow:0 20px 60px #000;pointer-events:none}
+.tooltip h4{margin:0 0 10px;font-size:15px}
+.tip-row{display:grid;grid-template-columns:100px 1fr;gap:8px;padding:5px 0;border-top:1px solid #202020;font-size:11px}
+.tip-row b{color:#7dd3fc;font-family:'JetBrains Mono',monospace;font-weight:500}
+.tip-row span{color:#c7cbd3;line-height:1.4}
+
+/* MODAL */
+.modal-backdrop{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.76);backdrop-filter:blur(8px)}
+.modal-backdrop.open{display:flex}
+.modal{width:min(860px,100%);max-height:88vh;overflow:auto;border:1px solid #343434;border-radius:18px;background:#101010;box-shadow:0 30px 100px #000}
+.modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid #252525;background:rgba(16,16,16,.96)}
+.modal-head h2{margin:0;font-size:20px}
+.modal-head p{margin:3px 0 0;color:var(--muted);font-size:11px;font-family:'JetBrains Mono',monospace}
+.close{margin-left:auto;border:1px solid #333;background:#181818;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:16px}
+.modal-body{padding:20px}
+.example-intro{padding:16px 18px;margin-bottom:14px;border-left:3px solid #3b82f6;background:#111827;border-radius:0 10px 10px 0;color:#d7dbe3;font-size:13px;line-height:1.65}
+.plain-steps{display:grid;gap:9px;counter-reset:plainstep}
+.plain-step{position:relative;padding:13px 14px 13px 48px;border:1px solid #292929;border-radius:10px;background:#131313;color:#c4c8d0;font-size:12px;line-height:1.55}
+.plain-step:before{counter-increment:plainstep;content:counter(plainstep);position:absolute;left:13px;top:13px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#1e3a5f;color:#bfdbfe;font:600 10px 'JetBrains Mono',monospace}
+.plain-step strong{display:block;margin-bottom:3px;color:#fff}
+.kicker{font:600 10px 'JetBrains Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:#60a5fa;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Animated Architecture Diagram</h1>
+  <div class="controlbar">
+    <button class="flow-btn" data-flow="full">▶ Play full flow</button>
+    <button class="flow-btn" data-flow="primary">▶ Primary path</button>
+    <button class="flow-btn" data-flow="failure">▶ Failure path</button>
+    <button class="small-btn" id="reset-flow">↺ Reset</button>
+    <div class="speed">
+      <span>Speed</span>
+      <select id="speed">
+        <option value="0.6">Slow</option>
+        <option value="1" selected>Normal</option>
+        <option value="1.7">Fast</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<div class="canvas-shell">
+  <div class="canvas-wrap">
+    <canvas id="arch-canvas" aria-label="Animated architecture diagram. Click nodes for detail."></canvas>
+    <div class="canvas-badge">CLICK NODE FOR DETAIL</div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2 id="modal-title"></h2><p id="modal-subtitle"></p></div>
+      <button class="close" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   DIAGRAM DATA  ← THIS IS THE ONLY SECTION YOU NEED TO CHANGE
+   ============================================================ */
+
+// Color palette – reference these by name in nodes/arrows
+const C = {
+  blue:'#3b82f6', indigo:'#6366f1', green:'#10b981',
+  amber:'#f59e0b', orange:'#f97316', teal:'#14b8a6',
+  cyan:'#06b6d4',  pink:'#ec4899',   purple:'#8b5cf6', red:'#ef4444'
+};
+
+// NODES: each box on the canvas
+// x, y = top-left corner (canvas is 1000 wide × 1200 tall)
+// w, h = width and height
+// color = border/glow color (use C.xxx)
+const nodes = [
+  { id:'user',        x:400, y:20,  w:200, h:78,  color:C.blue   },
+  { id:'freshservice',x:360, y:130, w:280, h:86,  color:C.indigo },
+  { id:'approval',    x:360, y:250, w:280, h:86,  color:C.orange },
+  { id:'python',      x:360, y:370, w:280, h:86,  color:C.amber  },
+  { id:'validation',  x:360, y:510, w:280, h:86,  color:C.amber  },
+  { id:'ticket',      x:700, y:510, w:220, h:86,  color:C.pink   },
+  { id:'sharepoint',  x:180, y:670, w:250, h:86,  color:C.green  },
+  { id:'registry',    x:560, y:670, w:250, h:86,  color:C.teal   },
+  { id:'viewer',      x:370, y:830, w:260, h:86,  color:C.cyan   },
+  { id:'download',    x:70,  y:990, w:205, h:86,  color:C.purple },
+  { id:'clickable',   x:398, y:990, w:205, h:86,  color:C.blue   },
+  { id:'dynamic',     x:726, y:990, w:205, h:86,  color:C.green  }
+];
+
+// NODE DETAILS: shown in tooltip and modal when a node is clicked
+const details = {
+  user:{
+    title:'User', subtitle:'Employee raising the request',
+    summary:'Creates or updates a dashboard by raising a Freshservice ticket with the required files and selecting a manager for approval.',
+    facts:[['Action','Raise Freshservice ticket'],['Tag','sharepoint-dashboard-automation'],['Files','dashboard.html and optional data.csv'],['Approval','Select manager from dropdown']],
+    does:['Fill the Freshservice form','Attach HTML and CSV files when needed','Select manager for approval','Track ticket comments for success or failure']
+  },
+  freshservice:{
+    title:'Freshservice Ticket', subtitle:'Request entry and tracking',
+    summary:'The starting point for every create or update request. The ticket carries form data, attachments, manager assignment, and later automation comments.',
+    facts:[['Tag','sharepoint-dashboard-automation'],['Attachments','HTML and optional CSV'],['Assignment','Selected manager'],['Outcome','Comments + close on success']],
+    does:['Capture request details','Hold uploaded files','Assign ticket to selected manager','Receive success or vulnerability comments from Python']
+  },
+  approval:{
+    title:'Manager Approval', subtitle:'Required before automation',
+    summary:'The selected manager must approve the ticket before the Python service starts. Without approval, files are not downloaded or published.',
+    facts:[['Selected by','Requester dropdown'],['Assigned to','Selected manager'],['Gate','Automation starts only after approval'],['Reject','Ticket stays blocked; no SharePoint publish']],
+    does:['Review request and attached files','Approve or reject the ticket','Unblock Python automation only on approval']
+  },
+  python:{
+    title:'Python Service', subtitle:'Automation and security checks',
+    summary:'A Python service watches for approved tickets, then downloads attachments, validates security, and publishes only if safe.',
+    facts:[['Trigger','Approved tagged tickets'],['Files','Download → validate → publish'],['Check','HTML security validation'],['Publish','SharePoint + Registry']],
+    does:['Fetch approved Freshservice tickets','Download attached HTML and CSV','Run security validation on HTML','Upload to SharePoint only when checks pass']
+  },
+  validation:{
+    title:'Security Validation', subtitle:'HTML vulnerability checks',
+    summary:'Python inspects the downloaded HTML for security vulnerabilities before any SharePoint publish. Failed checks stop the process and comment on the ticket.',
+    facts:[['Input','Downloaded ticket attachments'],['Pass','Continue to SharePoint'],['Fail','Comment on Freshservice ticket'],['Scope','Security-focused HTML checks']],
+    does:['Scan HTML for security issues','Allow publish only when checks pass','Comment vulnerability details when checks fail','End without SharePoint changes on failure']
+  },
+  ticket:{
+    title:'Ticket Update', subtitle:'Comment and close',
+    summary:'The Python service writes the result back to Freshservice. Failure comments explain the vulnerability. Success comments confirm availability and close the ticket.',
+    facts:[['Failure','Vulnerability comment'],['Success','Dashboard available comment'],['Close','After successful publish'],['Channel','Freshservice ticket']],
+    does:['Comment failure details when validation fails','Comment success details when publish completes','Close the ticket after successful publish']
+  },
+  sharepoint:{
+    title:'SharePoint Library', subtitle:'Final published files',
+    summary:'Only validated files are uploaded to the SharePoint Document Library under Department → Team → Dashboard.',
+    facts:[['Structure','/Department/Team/Dashboard/'],['Static','dashboard.html'],['Dynamic','dashboard.html + data.csv'],['Timing','Only after validation passes']],
+    does:['Create or update dashboard folder','Upload validated files','Apply SharePoint permissions','Serve files to the Viewer or download']
+  },
+  registry:{
+    title:'Dashboard Registry', subtitle:'SharePoint List',
+    summary:'After a successful SharePoint upload, Python updates the Dashboard Registry so the Viewer can find the dashboard.',
+    facts:[['Type','SharePoint List'],['Updated by','Python service'],['Rule','Not in Registry = not shown'],['Includes','Name, path, owner, status']],
+    does:['Create or update one row per dashboard','Store folder path and dashboard type','Mark status as Published after success','Support Viewer discovery']
+  },
+  viewer:{
+    title:'SPFx Viewer', subtitle:'Reusable online viewer',
+    summary:'One SharePoint web part opens published dashboards. It reads the Registry and loads validated files from SharePoint.',
+    facts:[['Deployed','Once'],['Source','Dashboard Registry'],['Files','SharePoint folder'],['Not used for','Intake or approval']],
+    does:['List published dashboards','Open dashboard by ID','Render HTML for clickable or dynamic dashboards']
+  },
+  download:{
+    title:'Download HTML', subtitle:'Open locally',
+    summary:'Authorized employees can download a published static dashboard.html from SharePoint and open it locally.',
+    facts:[['Source','SharePoint'],['Runtime','Local browser'],['Requires','Published validated file']],
+    does:['Download dashboard.html','Open locally without SPFx']
+  },
+  clickable:{
+    title:'Clickable Dashboard', subtitle:'Open online',
+    summary:'A published static dashboard can open through the SPFx Viewer using a shareable Dashboard ID link.',
+    facts:[['URL','Viewer?id=...'],['Lookup','Registry'],['Load','SharePoint HTML']],
+    does:['Resolve Registry entry','Load validated HTML','Open in SharePoint']
+  },
+  dynamic:{
+    title:'Dynamic Dashboard', subtitle:'HTML + CSV',
+    summary:'A dynamic dashboard publishes both dashboard.html and data.csv. After validation, both files go to the same SharePoint folder.',
+    facts:[['Files','dashboard.html + data.csv'],['Update data','Replace CSV'],['Update design','Replace HTML'],['Validation','Required before publish']],
+    does:['Publish both files together','Allow later CSV-only updates through a new ticket','Let HTML read data.csv after publish']
+  }
+};
+
+// ARROWS: connections between nodes
+// from/to = node ids, color = line color, label = text on the line
+// dashed: true = dashed line (failure/secondary paths)
+// route: 'horizontal' = side-to-side arrow | 'leftRail' = left-side vertical bypass | omit = vertical top-to-bottom
+const arrows = [
+  { id:'u-fs',    from:'user',       to:'freshservice', color:C.blue,   label:'raise ticket' },
+  { id:'fs-ap',   from:'freshservice',to:'approval',    color:C.orange, label:'assign manager' },
+  { id:'ap-py',   from:'approval',   to:'python',       color:C.amber,  label:'approved only' },
+  { id:'py-val',  from:'python',     to:'validation',   color:C.amber,  label:'download + scan' },
+  { id:'val-fail',from:'validation', to:'ticket',       color:C.red,    label:'vulnerability', dashed:true, route:'horizontal' },
+  { id:'val-sp',  from:'validation', to:'sharepoint',   color:C.green,  label:'if passed' },
+  { id:'py-reg',  from:'sharepoint', to:'registry',     color:C.teal,   label:'update list',  route:'horizontal' },
+  { id:'reg-ticket',from:'registry', to:'ticket',       color:C.pink,   label:'success + close', dashed:true },
+  { id:'reg-view',from:'registry',   to:'viewer',       color:C.cyan,   label:'discover' },
+  { id:'sp-view', from:'sharepoint', to:'viewer',       color:C.green,  label:'load files',   route:'leftRail' },
+  { id:'sp-down', from:'sharepoint', to:'download',     color:C.purple, label:'download' },
+  { id:'view-link',from:'viewer',    to:'clickable',    color:C.blue,   label:'open online' },
+  { id:'view-dyn',from:'viewer',     to:'dynamic',      color:C.green,  label:'HTML + CSV' }
+];
+
+// SWIMLANE LABELS: left-side section labels on the canvas
+const swimlanes = [
+  ['REQUEST + APPROVAL', 12, 110],
+  ['PYTHON AUTOMATION',  12, 360],
+  ['SECURITY VALIDATION',12, 490],
+  ['PUBLISH',            12, 650],
+  ['CONSUME',            12, 815],
+  ['DELIVERY OPTIONS',   12, 970]
+];
+
+// LEGEND entries: shown bottom-left of canvas
+const legendItems = [
+  { color:C.blue,  label:'request'   },
+  { color:C.amber, label:'automation'},
+  { color:C.green, label:'publish'   },
+  { color:C.red,   label:'failure path'}
+];
+
+// FLOW ANIMATIONS: which arrow ids to animate for each button
+const flowMap = {
+  full:    arrows.map(a => a.id),
+  primary: ['u-fs','fs-ap','ap-py','py-val','val-sp','py-reg','reg-ticket'],
+  failure: ['u-fs','fs-ap','ap-py','py-val','val-fail']
+};
+
+/* ============================================================
+   ENGINE (no changes needed below this line)
+   ============================================================ */
+
+const canvas = document.getElementById('arch-canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = canvas.parentElement;
+
+let dpr=1, scale=1, last=0, hover=null;
+let activeFlow=null, flowIndex=0, flowProgress=0, flowRunning=false, speed=1;
+const pulses={}, idleProgress={};
+arrows.forEach((a,i) => idleProgress[a.id] = (i * 0.13) % 1);
+
+// Build legend
+document.getElementById('legend').innerHTML =
+  legendItems.map(l => `<span><i style="background:${l.color}"></i>${l.label}</span>`).join('');
+
+function resizeCanvas(){
+  dpr = Math.min(devicePixelRatio||1, 2);
+  const rect = wrap.getBoundingClientRect();
+  canvas.width  = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  scale = rect.width / 1000;
+  ctx.setTransform(dpr*scale, 0, 0, dpr*scale, 0, 0);
+}
+function getNode(id){ return nodes.find(n => n.id === id); }
+
+function endpoints(a){
+  const f = getNode(a.from), t = getNode(a.to);
+  if(a.route === 'horizontal')
+    return [{ x: f.x + (t.x > f.x ? f.w : 0), y: f.y + f.h/2 },
+            { x: t.x + (t.x > f.x ? 0 : t.w), y: t.y + t.h/2 }];
+  return [{ x: f.x + f.w/2, y: f.y + f.h }, { x: t.x + t.w/2, y: t.y }];
+}
+
+function pathPoints(a){
+  const [s, t] = endpoints(a);
+  if(a.route === 'horizontal') return [s, t];
+  if(a.route === 'leftRail'){
+    const f = getNode(a.from), tg = getNode(a.to);
+    const start = { x: f.x + f.w/2, y: f.y + f.h };
+    const end   = { x: tg.x,        y: tg.y + tg.h/2 };
+    return [start, { x:120, y:start.y }, { x:120, y:end.y }, end];
+  }
+  const mid = (s.y + t.y) / 2;
+  return [s, { x:s.x, y:mid }, { x:t.x, y:mid }, t];
+}
+
+function pointOnPath(pts, p){
+  const lens = [];
+  let total = 0;
+  for(let i = 0; i < pts.length - 1; i++){
+    const l = Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y);
+    lens.push(l); total += l;
+  }
+  let target = p * total;
+  for(let i = 0; i < lens.length; i++){
+    if(target <= lens[i]){
+      const q = target / lens[i];
+      return { x: pts[i].x + (pts[i+1].x - pts[i].x)*q,
+               y: pts[i].y + (pts[i+1].y - pts[i].y)*q };
+    }
+    target -= lens[i];
+  }
+  return pts[pts.length - 1];
+}
+
+function drawArrow(a, opacity=1, progress=null){
+  const pts = pathPoints(a);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.strokeStyle = a.color;
+  ctx.lineWidth   = 1.4;
+  ctx.setLineDash(a.dashed ? [7,6] : []);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // arrowhead
+  const p1 = pts[pts.length-2], p2 = pts[pts.length-1];
+  const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+  ctx.fillStyle = a.color;
+  ctx.beginPath();
+  ctx.moveTo(p2.x, p2.y);
+  ctx.lineTo(p2.x - 8*Math.cos(ang-.45), p2.y - 8*Math.sin(ang-.45));
+  ctx.lineTo(p2.x - 8*Math.cos(ang+.45), p2.y - 8*Math.sin(ang+.45));
+  ctx.closePath(); ctx.fill();
+
+  // label
+  const mid = pointOnPath(pts, .5);
+  ctx.font = "500 9px 'JetBrains Mono'";
+  const tw = ctx.measureText(a.label).width;
+  ctx.fillStyle = '#0b0b0b';
+  ctx.fillRect(mid.x - tw/2 - 4, mid.y - 7, tw + 8, 14);
+  ctx.fillStyle = a.color;
+  ctx.textAlign = 'center';
+  ctx.fillText(a.label, mid.x, mid.y + 3);
+
+  // travelling dot
+  if(progress !== null){
+    const dot = pointOnPath(pts, progress);
+    ctx.shadowBlur  = 14;
+    ctx.shadowColor = a.color;
+    ctx.fillStyle   = '#fff';
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, 4.2, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawNode(n, time){
+  const d = details[n.id];
+  const isHover = hover === n.id;
+  const pulse   = pulses[n.id] && time - pulses[n.id] < 450;
+  ctx.save();
+  ctx.shadowColor = n.color;
+  ctx.shadowBlur  = isHover ? 25 : pulse ? 34 : 7;
+  ctx.fillStyle   = '#111';
+  ctx.strokeStyle = n.color;
+  ctx.lineWidth   = isHover || pulse ? 2.2 : 1.25;
+  ctx.setLineDash([7,5]);
+  ctx.beginPath(); ctx.roundRect(n.x, n.y, n.w, n.h, 13); ctx.fill(); ctx.stroke();
+  ctx.setLineDash([]);
+
+  if(pulse){
+    ctx.globalAlpha = Math.max(0, 1 - (time - pulses[n.id]) / 450);
+    ctx.lineWidth   = 3;
+    ctx.strokeStyle = n.color;
+    ctx.beginPath(); ctx.roundRect(n.x-5, n.y-5, n.w+10, n.h+10, 16); ctx.stroke();
+  }
+  ctx.shadowBlur  = 0;
+  ctx.textAlign   = 'center';
+  ctx.font        = '700 14px Outfit';
+  ctx.fillStyle   = '#f7f7f7';
+  ctx.fillText(d.title, n.x + n.w/2, n.y + 38);
+  ctx.font        = "500 8.5px 'JetBrains Mono'";
+  ctx.fillStyle   = '#a0a6b1';
+  const sub = d.subtitle.length > 38 ? d.subtitle.slice(0,37)+'…' : d.subtitle;
+  ctx.fillText(sub, n.x + n.w/2, n.y + 58);
+  ctx.restore();
+}
+
+function background(){
+  ctx.fillStyle = '#0b0b0b';
+  ctx.fillRect(0, 0, 1000, 1200);
+  ctx.strokeStyle = '#171717'; ctx.lineWidth = .7;
+  for(let x = 0; x <= 1000; x += 25){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,1200); ctx.stroke(); }
+  for(let y = 0; y <= 1200; y += 25){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(1000,y); ctx.stroke(); }
+  ctx.font      = "600 9px 'JetBrains Mono'";
+  ctx.fillStyle = '#444';
+  ctx.textAlign = 'left';
+  swimlanes.forEach(v => ctx.fillText(v[0], v[1], v[2]));
+}
+
+function animate(t){
+  const dt = Math.min(50, t - last || 16);
+  last = t;
+  background();
+  arrows.forEach(a => {
+    let opacity = activeFlow && !flowMap[activeFlow].includes(a.id) ? .14 : 1;
+    let prog = null;
+    if(!flowRunning){
+      idleProgress[a.id] = (idleProgress[a.id] + dt * .00012 * speed) % 1;
+      prog = idleProgress[a.id];
+    } else if(flowMap[activeFlow][flowIndex] === a.id){
+      flowProgress += dt * .00055 * speed;
+      prog = Math.min(flowProgress, 1);
+      if(flowProgress >= 1){
+        pulses[a.to] = t;
+        flowProgress = 0; flowIndex++;
+        if(flowIndex >= flowMap[activeFlow].length){
+          flowRunning = false;
+          setTimeout(resetFlow, 500);
+        }
+      }
+    }
+    drawArrow(a, opacity, prog);
+  });
+  nodes.forEach(n => drawNode(n, t));
+  requestAnimationFrame(animate);
+}
+
+function playFlow(id){ activeFlow=id; flowIndex=0; flowProgress=0; flowRunning=true; updateBtns(id); }
+function resetFlow(){ activeFlow=null; flowRunning=false; flowIndex=0; flowProgress=0; updateBtns(null); }
+function updateBtns(id){ document.querySelectorAll('.flow-btn').forEach(b => b.classList.toggle('active', b.dataset.flow===id)); }
+
+// Canvas mouse events
+const tooltip = document.getElementById('tooltip');
+let tipTimer;
+function canvasPoint(e){
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX-r.left)/r.width*1000, y: (e.clientY-r.top)/r.height*1200 };
+}
+canvas.addEventListener('mousemove', e => {
+  const p = canvasPoint(e);
+  const hit = nodes.find(n => p.x>=n.x && p.x<=n.x+n.w && p.y>=n.y && p.y<=n.y+n.h);
+  hover = hit ? hit.id : null;
+  canvas.style.cursor = hit ? 'pointer' : 'default';
+  clearTimeout(tipTimer);
+  if(!hit){ tooltip.style.display='none'; return; }
+  tipTimer = setTimeout(() => {
+    const d = details[hit.id];
+    tooltip.innerHTML = `<h4>${d.title}</h4>${d.facts.slice(0,5).map(f=>`<div class="tip-row"><b>${f[0]}</b><span>${f[1]}</span></div>`).join('')}<div style="margin-top:8px;color:#60a5fa;font:500 9px 'JetBrains Mono'">CLICK FOR COMPLETE DETAIL</div>`;
+    tooltip.style.display = 'block';
+    tooltip.style.left = Math.min(innerWidth-335, e.clientX+16)+'px';
+    tooltip.style.top  = Math.min(innerHeight-tooltip.offsetHeight-15, e.clientY+15)+'px';
+  }, 45);
+});
+canvas.addEventListener('mouseleave', () => { hover=null; tooltip.style.display='none'; });
+canvas.addEventListener('click', e => {
+  const p = canvasPoint(e);
+  const hit = nodes.find(n => p.x>=n.x && p.x<=n.x+n.w && p.y>=n.y && p.y<=n.y+n.h);
+  if(hit) openModal(hit.id);
+});
+
+// Flow buttons
+document.querySelectorAll('.flow-btn').forEach(b => b.addEventListener('click', () => playFlow(b.dataset.flow)));
+document.getElementById('reset-flow').onclick = resetFlow;
+document.getElementById('speed').onchange = e => speed = +e.target.value;
+
+// Modal
+function openModal(id){
+  const d = details[id]; if(!d) return;
+  tooltip.style.display = 'none';
+  document.getElementById('modal-title').textContent    = d.title;
+  document.getElementById('modal-subtitle').textContent = d.subtitle;
+  document.getElementById('modal-body').innerHTML =
+    `<div class="example-intro">${d.summary}</div>`+
+    `<div class="plain-steps">${d.does.map(x=>`<div class="plain-step"><strong>${x}</strong></div>`).join('')}</div>`;
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(){ document.getElementById('modal-backdrop').classList.remove('open'); document.body.style.overflow=''; }
+document.getElementById('modal-close').onclick = closeModal;
+document.getElementById('modal-backdrop').addEventListener('click', e => { if(e.target.id==='modal-backdrop') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+// Init
+new ResizeObserver(resizeCanvas).observe(wrap);
+resizeCanvas();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
