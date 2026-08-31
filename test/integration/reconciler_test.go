@@ -230,7 +230,6 @@ func waitForActiveIncidentReport(ctx context.Context, podName, namespace string,
 	return found
 }
 
-
 // waitForIncidentReportByNameWithTouch polls for an IncidentReport while periodically
 // touching a pod to drive reconciliation.
 func waitForIncidentReportByNameWithTouch(ctx context.Context, name, namespace, podName string, timeout time.Duration) {
