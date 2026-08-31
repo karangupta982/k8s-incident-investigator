@@ -1,0 +1,31 @@
+# image-pull-fail.yaml — A Deployment referencing a deliberately invalid image.
+# This triggers the ImagePullBackOff detection path of the Incident Investigator.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-pull-fail
+  namespace: demo
+  labels:
+    app: image-pull-fail
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-pull-fail
+  template:
+    metadata:
+      labels:
+        app: image-pull-fail
+    spec:
+      containers:
+      - name: app
+        # Deliberately invalid image — will cause ImagePullBackOff immediately
+        image: this-image-does-not-exist-k8s-incident-investigator:v0.0.0
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "32Mi"
+            cpu: "10m"

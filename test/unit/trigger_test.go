@@ -325,12 +325,12 @@ func TestTriggerEvaluator_TableDriven(t *testing.T) {
 			wantTrigger: false,
 		},
 		{
-			name: "ContainerCreating — no trigger",
+			name:        "ContainerCreating — no trigger",
 			tc:          investigation.TriggerContext{Pod: podWithWaitingContainer("ContainerCreating")},
 			wantTrigger: false,
 		},
 		{
-			name: "PodInitializing — no trigger",
+			name:        "PodInitializing — no trigger",
 			tc:          investigation.TriggerContext{Pod: podWithWaitingContainer("PodInitializing")},
 			wantTrigger: false,
 		},
