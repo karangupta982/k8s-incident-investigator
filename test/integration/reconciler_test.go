@@ -230,22 +230,12 @@ func waitForActiveIncidentReport(ctx context.Context, podName, namespace string,
 	return found
 }
 
-// waitForIncidentReportByName polls until an IncidentReport with the exact given name exists.
-func waitForIncidentReportByName(ctx context.Context, name, namespace string, timeout time.Duration) *v1alpha1.IncidentReport {
-	report := &v1alpha1.IncidentReport{}
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, report)
-		return err == nil
-	}, timeout, 200*time.Millisecond).Should(BeTrue(), "expected IncidentReport %s/%s to exist", namespace, name)
-	return report
-}
-
 // waitForIncidentReportByNameWithTouch polls for an IncidentReport while periodically
 // touching a pod to drive reconciliation.
-func waitForIncidentReportByNameWithTouch(ctx context.Context, name, namespace, podName string, timeout time.Duration) *v1alpha1.IncidentReport {
-	report := &v1alpha1.IncidentReport{}
+func waitForIncidentReportByNameWithTouch(ctx context.Context, name, namespace, podName string, timeout time.Duration) {
 	touchCount := 0
 	Eventually(func() bool {
+		report := &v1alpha1.IncidentReport{}
 		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, report); err == nil {
 			return true
 		}
@@ -255,7 +245,6 @@ func waitForIncidentReportByNameWithTouch(ctx context.Context, name, namespace, 
 		}
 		return false
 	}, timeout, 500*time.Millisecond).Should(BeTrue(), "expected IncidentReport %s/%s to exist", namespace, name)
-	return report
 }
 
 // waitForIncidentPhase polls until the IncidentReport reaches the expected phase.
@@ -1025,8 +1014,20 @@ var _ = Describe("Lifecycle transitions", func() {
 		// Wait for an active IncidentReport to appear.
 		// The event watch drives the reconcile; no pod touch needed here.
 		ir := waitForActiveIncidentReport(ctx, "mount-pod", namespace, 10*time.Second)
-		Expect(ir.Status.Trigger).NotTo(BeNil())
-		Expect(ir.Status.Trigger.Type).To(Equal(v1alpha1.TriggerMountFailure))
+		Expect(ir).NotTo(BeNil())
+
+		// Wait for the status (Trigger) to be set via the status subresource — it is async.
+		Eventually(func() v1alpha1.TriggerType {
+			fresh := &v1alpha1.IncidentReport{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: ir.Name, Namespace: namespace}, fresh); err != nil {
+				return ""
+			}
+			if fresh.Status.Trigger == nil {
+				return ""
+			}
+			return fresh.Status.Trigger.Type
+		}, 10*time.Second, 200*time.Millisecond).Should(Equal(v1alpha1.TriggerMountFailure),
+			"IncidentReport trigger type should be MountFailure")
 	})
 
 	It("keeps the IncidentReport active after the Pod is deleted during an active incident", func() {

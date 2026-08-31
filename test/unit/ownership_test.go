@@ -50,13 +50,13 @@ func buildOwnershipScheme(t *testing.T) *runtime.Scheme {
 
 func boolPtr(b bool) *bool { return &b }
 
-func makeOwnerRef(kind, name string, uid types.UID, isController bool) metav1.OwnerReference {
+func makeOwnerRef(kind, name string, uid types.UID) metav1.OwnerReference {
 	return metav1.OwnerReference{
 		APIVersion: "apps/v1",
 		Kind:       kind,
 		Name:       name,
 		UID:        uid,
-		Controller: boolPtr(isController),
+		Controller: boolPtr(true),
 	}
 }
 
@@ -65,7 +65,7 @@ func podWithOwner(kind, name string, uid types.UID) *corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test-pod",
 			Namespace:       "default",
-			OwnerReferences: []metav1.OwnerReference{makeOwnerRef(kind, name, uid, true)},
+			OwnerReferences: []metav1.OwnerReference{makeOwnerRef(kind, name, uid)},
 		},
 	}
 }
@@ -84,7 +84,7 @@ func TestOwnershipResolver_PodToDeployment(t *testing.T) {
 			Namespace: "default",
 			UID:       rsUID,
 			OwnerReferences: []metav1.OwnerReference{
-				makeOwnerRef("Deployment", "my-deployment", deployUID, true),
+				makeOwnerRef("Deployment", "my-deployment", deployUID),
 			},
 		},
 	}
@@ -201,7 +201,7 @@ func TestOwnershipResolver_PodToJobToCronJob(t *testing.T) {
 			Namespace: "default",
 			UID:       jobUID,
 			OwnerReferences: []metav1.OwnerReference{
-				makeOwnerRef("CronJob", "my-cron", cronUID, true),
+				makeOwnerRef("CronJob", "my-cron", cronUID),
 			},
 		},
 	}
@@ -248,7 +248,7 @@ func TestOwnershipResolver_RSFoundDeploymentNotFound_FallbackToPod(t *testing.T)
 			Namespace: "default",
 			UID:       rsUID,
 			OwnerReferences: []metav1.OwnerReference{
-				makeOwnerRef("Deployment", "missing-deploy", deployUID, true),
+				makeOwnerRef("Deployment", "missing-deploy", deployUID),
 			},
 		},
 	}
@@ -303,7 +303,7 @@ func TestProperty5_OwnershipResolutionIsDeterministic(t *testing.T) {
 			Namespace: "default",
 			UID:       rsUID,
 			OwnerReferences: []metav1.OwnerReference{
-				makeOwnerRef("Deployment", "det-deployment", deployUID, true),
+				makeOwnerRef("Deployment", "det-deployment", deployUID),
 			},
 		},
 	}
