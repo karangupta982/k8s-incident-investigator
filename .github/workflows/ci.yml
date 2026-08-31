@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [ "develop", "main", "master", "feature/**", "feat/**", "fix/**" ]
+  pull_request:
+    branches: [ "develop", "main", "master" ]
+
+jobs:
+
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Check formatting
+      run: |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "The following files are not formatted:"
+          echo "$unformatted"
+          exit 1
+        fi
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Run go vet
+      run: go vet ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
+
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Run unit tests
+      run: go test ./test/unit/... -v -count=1 -timeout=60s
+
+  integration-test:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Install setup-envtest
+      run: |
+        GOBIN=$(pwd)/bin go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
+    - name: Download envtest binaries
+      run: |
+        ASSETS=$(./bin/setup-envtest use 1.32.0 -p path)
+        echo "KUBEBUILDER_ASSETS=${ASSETS}" >> $GITHUB_ENV
+    - name: Run integration tests
+      run: go test ./test/integration/... -v -count=1 -timeout=180s
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+    - name: Build manager binary
+      run: make build
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build Docker image
+      run: make docker-build IMG=incident-investigator:ci

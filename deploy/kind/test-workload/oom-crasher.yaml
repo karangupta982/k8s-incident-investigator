@@ -1,0 +1,43 @@
+# oom-crasher.yaml — A Deployment whose container deliberately exceeds its memory limit.
+# The container allocates 200MB but the limit is 64Mi, causing immediate OOMKill.
+# This triggers the OOMKilled detection path of the Incident Investigator.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oom-crasher
+  namespace: demo
+  labels:
+    app: oom-crasher
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oom-crasher
+  template:
+    metadata:
+      labels:
+        app: oom-crasher
+    spec:
+      containers:
+      - name: crasher
+        image: polinux/stress
+        args:
+        - "--vm"
+        - "1"
+        - "--vm-bytes"
+        - "200M"
+        - "--vm-hang"
+        - "0"
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "32Mi"
+            cpu: "10m"

@@ -35,11 +35,6 @@ func defaultCfg() *config.Config {
 	return config.DefaultConfig()
 }
 
-func evalTrigger(t *testing.T, tc investigation.TriggerContext, cfg *config.Config) investigation.TriggerResult {
-	t.Helper()
-	return investigation.NewTriggerEvaluator().Evaluate(context.Background(), tc, cfg)
-}
-
 // podWithWaitingContainer builds a Pod where the named container is in a waiting state.
 func podWithWaitingContainer(reason string) *corev1.Pod {
 	return &corev1.Pod{
@@ -325,12 +320,12 @@ func TestTriggerEvaluator_TableDriven(t *testing.T) {
 			wantTrigger: false,
 		},
 		{
-			name: "ContainerCreating — no trigger",
+			name:        "ContainerCreating — no trigger",
 			tc:          investigation.TriggerContext{Pod: podWithWaitingContainer("ContainerCreating")},
 			wantTrigger: false,
 		},
 		{
-			name: "PodInitializing — no trigger",
+			name:        "PodInitializing — no trigger",
 			tc:          investigation.TriggerContext{Pod: podWithWaitingContainer("PodInitializing")},
 			wantTrigger: false,
 		},
