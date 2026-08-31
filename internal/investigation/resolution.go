@@ -56,21 +56,15 @@ func NewResolutionTransitioner(c client.Client, log logr.Logger) *ResolutionTran
 // `now` is the resolution timestamp.
 func (t *ResolutionTransitioner) Transition(ctx context.Context, active *v1alpha1.IncidentReport, now time.Time) error {
 	// Determine historical name before mutating the active object.
-	historicalName, err := t.historicalName(active, now)
-	if err != nil {
-		return err
-	}
+	historicalName := t.historicalName(active, now)
 
 	// ---- Step 1: Single PATCH ----
 	// Atomically set phase=Resolved, resolvedAt=now, clear stabilityStartedAt, remove active label.
 	// We patch both metadata and status in two sub-steps because the status subresource
 	// only accepts status changes, and metadata labels require a separate patch.
 
-	// Make base copies for both patches before mutating 'active'.
-	// The status patch and metadata patch require separate base objects because
-	// each patch uses its own resourceVersion snapshot.
+	// Make a base copy for the status patch.
 	statusBase := active.DeepCopy()
-	labelBase := active.DeepCopy()
 
 	resolved := metav1.NewTime(now)
 	active.Status.Phase = v1alpha1.PhaseResolved
@@ -86,7 +80,7 @@ func (t *ResolutionTransitioner) Transition(ctx context.Context, active *v1alpha
 	if err := t.client.Get(ctx, client.ObjectKeyFromObject(active), active); err != nil {
 		return fmt.Errorf("re-fetching IncidentReport before label patch: %w", err)
 	}
-	labelBase = active.DeepCopy()
+	labelBase := active.DeepCopy()
 	if active.Labels == nil {
 		active.Labels = map[string]string{}
 	}
@@ -137,14 +131,14 @@ func (t *ResolutionTransitioner) Transition(ctx context.Context, active *v1alpha
 
 // historicalName computes the historical name for the active report.
 // Falls back to a date-based name when workload identity or startedAt is unavailable.
-func (t *ResolutionTransitioner) historicalName(active *v1alpha1.IncidentReport, now time.Time) (string, error) {
+func (t *ResolutionTransitioner) historicalName(active *v1alpha1.IncidentReport, now time.Time) string {
 	if active.Spec.Workload != nil && active.Status.StartedAt != nil {
 		return GenerateHistoricalName(
 			active.Spec.Workload.Name,
 			active.Spec.Workload.Kind,
 			active.Namespace,
 			active.Status.StartedAt.Time,
-		), nil
+		)
 	}
 	// Pod-level fallback: use active name as base with date suffix.
 	base := active.Name
@@ -158,7 +152,7 @@ func (t *ResolutionTransitioner) historicalName(active *v1alpha1.IncidentReport,
 	if len(name) > maxNameLength {
 		name = name[:maxNameLength]
 	}
-	return name, nil
+	return name
 }
 
 // buildHistoricalReport constructs a fresh IncidentReport with the historical name.

@@ -187,7 +187,7 @@ func (e *TriggerEvaluator) Evaluate(_ context.Context, tc TriggerContext, cfg *c
 					Type:        v1alpha1.TriggerEviction,
 					Source:      v1alpha1.TriggerSourceStateBased,
 					IsImmediate: true,
-					Reason:      string(cond.Reason),
+					Reason:      cond.Reason,
 				}
 			}
 		}
@@ -251,5 +251,5 @@ func hasFailureReason(pod *corev1.Pod) bool {
 
 // isEvictionCondition returns true if the condition indicates a node eviction.
 func isEvictionCondition(cond corev1.PodCondition) bool {
-	return string(cond.Reason) == "Evicted" || string(cond.Type) == "DisruptionTarget"
+	return cond.Reason == "Evicted" || cond.Type == corev1.DisruptionTarget
 }
