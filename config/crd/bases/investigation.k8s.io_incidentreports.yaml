@@ -3,8 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    api-approved.kubernetes.io: unapproved, is a demo project for local development
     controller-gen.kubebuilder.io/version: v0.17.1
-    api-approved.kubernetes.io: "unapproved, testing only"
   name: incidentreports.investigation.k8s.io
 spec:
   group: investigation.k8s.io
