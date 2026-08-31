@@ -19,6 +19,7 @@ package investigation
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -65,20 +66,27 @@ func (t *ResolutionTransitioner) Transition(ctx context.Context, active *v1alpha
 	// We patch both metadata and status in two sub-steps because the status subresource
 	// only accepts status changes, and metadata labels require a separate patch.
 
-	// Make a base copy for status patch.
-	baseCopy := active.DeepCopy()
+	// Make base copies for both patches before mutating 'active'.
+	// The status patch and metadata patch require separate base objects because
+	// each patch uses its own resourceVersion snapshot.
+	statusBase := active.DeepCopy()
+	labelBase := active.DeepCopy()
 
 	resolved := metav1.NewTime(now)
 	active.Status.Phase = v1alpha1.PhaseResolved
 	active.Status.ResolvedAt = &resolved
 	active.Status.StabilityStartedAt = nil
 
-	if err := t.client.Status().Patch(ctx, active, client.MergeFrom(baseCopy)); err != nil {
+	if err := t.client.Status().Patch(ctx, active, client.MergeFrom(statusBase)); err != nil {
 		return fmt.Errorf("patching IncidentReport status to Resolved: %w", err)
 	}
 
 	// Patch metadata labels to remove the active label.
-	labelBase := active.DeepCopy()
+	// Re-fetch the object to get the latest resourceVersion after the status patch.
+	if err := t.client.Get(ctx, client.ObjectKeyFromObject(active), active); err != nil {
+		return fmt.Errorf("re-fetching IncidentReport before label patch: %w", err)
+	}
+	labelBase = active.DeepCopy()
 	if active.Labels == nil {
 		active.Labels = map[string]string{}
 	}
@@ -89,12 +97,32 @@ func (t *ResolutionTransitioner) Transition(ctx context.Context, active *v1alpha
 
 	// ---- Step 2: CREATE historical copy ----
 	historical := buildHistoricalReport(active, historicalName)
-	if err := t.client.Create(ctx, historical); err != nil && !errors.IsAlreadyExists(err) {
-		return fmt.Errorf("creating historical IncidentReport %s/%s: %w", active.Namespace, historicalName, err)
+	if err := t.client.Create(ctx, historical); err != nil {
+		if errors.IsAlreadyExists(err) {
+			t.log.Info("historical IncidentReport already exists (idempotent)",
+				"name", historicalName, "namespace", active.Namespace)
+		} else if errors.IsNotFound(err) || isNamespaceTerminating(err) {
+			// Namespace is being deleted — nothing to do, the active slot will also disappear.
+			t.log.Info("namespace is terminating, skipping historical record creation",
+				"name", historicalName, "namespace", active.Namespace)
+			return nil
+		} else {
+			return fmt.Errorf("creating historical IncidentReport %s/%s: %w", active.Namespace, historicalName, err)
+		}
+	} else {
+		// Persist the status on the historical record via the status subresource.
+		// client.Create() strips status for resources with a status subresource.
+		historicalStatus := active.Status.DeepCopy()
+		historical.Status = *historicalStatus
+		if err := t.client.Status().Update(ctx, historical); err != nil && !errors.IsNotFound(err) {
+			t.log.Error(err, "failed to set status on historical IncidentReport (non-fatal)",
+				"name", historicalName, "namespace", active.Namespace)
+			// Non-fatal: the historical record still exists, just without status yet.
+		}
+		t.log.Info("created historical IncidentReport",
+			"name", historicalName,
+			"namespace", active.Namespace)
 	}
-	t.log.Info("created historical IncidentReport",
-		"name", historicalName,
-		"namespace", active.Namespace)
 
 	// ---- Step 3: DELETE the active slot ----
 	if err := t.client.Delete(ctx, active); err != nil && !errors.IsNotFound(err) {
@@ -136,6 +164,16 @@ func (t *ResolutionTransitioner) historicalName(active *v1alpha1.IncidentReport,
 // buildHistoricalReport constructs a fresh IncidentReport with the historical name.
 // Server-managed metadata fields (UID, ResourceVersion, CreationTimestamp,
 // ManagedFields, DeletionTimestamp, Finalizers) are explicitly excluded.
+// isNamespaceTerminating returns true when the error indicates the namespace is being deleted.
+func isNamespaceTerminating(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "unable to create new content in namespace") &&
+		strings.Contains(msg, "because it is being terminated")
+}
+
 func buildHistoricalReport(active *v1alpha1.IncidentReport, historicalName string) *v1alpha1.IncidentReport {
 	labels := make(map[string]string, len(active.Labels))
 	for k, v := range active.Labels {
