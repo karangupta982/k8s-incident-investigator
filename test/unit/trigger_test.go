@@ -35,7 +35,6 @@ func defaultCfg() *config.Config {
 	return config.DefaultConfig()
 }
 
-
 // podWithWaitingContainer builds a Pod where the named container is in a waiting state.
 func podWithWaitingContainer(reason string) *corev1.Pod {
 	return &corev1.Pod{
