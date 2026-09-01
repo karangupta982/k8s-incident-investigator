@@ -944,9 +944,15 @@ var _ = Describe("Lifecycle transitions", func() {
 			"should have historical record plus new active report")
 
 		// The new active report should be Investigating.
-		newIR := &v1alpha1.IncidentReport{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: activeName, Namespace: namespace}, newIR)).To(Succeed())
-		Expect(newIR.Status.Phase).To(Equal(v1alpha1.PhaseInvestigating))
+		// Use Eventually — the status PATCH is asynchronous after the object is created.
+		Eventually(func() v1alpha1.IncidentPhase {
+			newIR := &v1alpha1.IncidentReport{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: activeName, Namespace: namespace}, newIR); err != nil {
+				return ""
+			}
+			return newIR.Status.Phase
+		}, 10*time.Second, 200*time.Millisecond).Should(Equal(v1alpha1.PhaseInvestigating),
+			"new active IncidentReport should have phase Investigating")
 	})
 
 	It("does not trigger an incident for a healthy Running Pod with zero event counts", func() {
