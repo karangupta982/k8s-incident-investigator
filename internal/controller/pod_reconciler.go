@@ -40,6 +40,7 @@ import (
 
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/correlation"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
@@ -73,6 +74,7 @@ type PodReconciler struct {
 	RecoveryEvaluator    investigation.RecoveryEvaluatorInterface
 	Transitioner         *investigation.ResolutionTransitioner
 	EvidenceOrchestrator *evidence.EvidenceOrchestrator
+	EvidCorrelator       *correlation.EvidenceCorrelator
 	Log                  logr.Logger
 }
 
@@ -278,6 +280,17 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			log.Error(patchErr, "failed to patch evidence snapshot, will retry on next reconciliation")
 			// Non-fatal: restore the pre-patch report so recovery evaluation continues
 			report.Status.Evidence = nil
+		}
+	}
+
+	// ---- Step 9.55: Correlate evidence ----
+	if r.EvidCorrelator != nil && report.Status.Evidence != nil {
+		correlated := r.EvidCorrelator.Correlate(report.Status.Evidence)
+		correlBase := report.DeepCopy()
+		report.Status.CorrelatedEvidence = &correlated
+		if patchErr := r.Status().Patch(ctx, report, client.MergeFrom(correlBase)); patchErr != nil {
+			log.Error(patchErr, "failed to patch correlated evidence, will retry on next reconciliation")
+			report.Status.CorrelatedEvidence = nil
 		}
 	}
 

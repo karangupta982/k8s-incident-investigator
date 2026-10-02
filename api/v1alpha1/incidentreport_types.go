@@ -85,6 +85,11 @@ type IncidentReportStatus struct {
 	// +optional
 	Evidence *EvidenceSnapshot `json:"evidence,omitempty"`
 
+	// CorrelatedEvidence holds derived signals computed from the EvidenceSnapshot.
+	// Updated after each evidence collection cycle.
+	// +optional
+	CorrelatedEvidence *CorrelatedEvidence `json:"correlatedEvidence,omitempty"`
+
 	// Conditions provides standard Kubernetes condition semantics for the incident state.
 	// +optional
 	// +listType=map

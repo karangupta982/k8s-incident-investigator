@@ -44,6 +44,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/controller"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/correlation"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
@@ -164,6 +165,10 @@ func main() {
 		Log:        log,
 	}
 
+	evCorrelator := &correlation.EvidenceCorrelator{
+		EventCorrelationWindow: 5 * time.Minute,
+	}
+
 	reconciler := &controller.PodReconciler{
 		Client:               mgr.GetClient(),
 		Scheme:               mgr.GetScheme(),
@@ -174,6 +179,7 @@ func main() {
 		RecoveryEvaluator:    investigation.NewRecoveryEvaluator(),
 		Transitioner:         investigation.NewResolutionTransitioner(mgr.GetClient(), log),
 		EvidenceOrchestrator: evOrchestrator,
+		EvidCorrelator:       evCorrelator,
 		Log:                  log,
 	}
 
