@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/controller"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
 
@@ -80,6 +82,10 @@ var _ = BeforeSuite(func() {
 		MountFailureThreshold:          3,
 		SchedulingFailureThreshold:     5,
 		RequeueInterval:                500 * time.Millisecond,
+		MaxLogBytes:                    32768,
+		MaxLogLines:                    200,
+		MaxEventsPerIncident:           25,
+		EvidenceCollectionTimeout:      5 * time.Second,
 	}
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -90,16 +96,27 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	log := ctrl.Log.WithName("test-controller")
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	evOrchestrator := &evidence.EvidenceOrchestrator{
+		Client:     mgr.GetClient(),
+		KubeClient: kubeClient,
+		Config:     testCfg,
+		Log:        log,
+	}
+
 	reconciler := &controller.PodReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Config:            testCfg,
-		TriggerEvaluator:  investigation.NewTriggerEvaluator(),
-		OwnershipResolver: investigation.NewOwnershipResolver(mgr.GetClient(), log),
-		Correlator:        investigation.NewIncidentCorrelator(mgr.GetClient(), log),
-		RecoveryEvaluator: investigation.NewRecoveryEvaluator(),
-		Transitioner:      investigation.NewResolutionTransitioner(mgr.GetClient(), log),
-		Log:               log,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Config:               testCfg,
+		TriggerEvaluator:     investigation.NewTriggerEvaluator(),
+		OwnershipResolver:    investigation.NewOwnershipResolver(mgr.GetClient(), log),
+		Correlator:           investigation.NewIncidentCorrelator(mgr.GetClient(), log),
+		RecoveryEvaluator:    investigation.NewRecoveryEvaluator(),
+		Transitioner:         investigation.NewResolutionTransitioner(mgr.GetClient(), log),
+		EvidenceOrchestrator: evOrchestrator,
+		Log:                  log,
 	}
 	Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 

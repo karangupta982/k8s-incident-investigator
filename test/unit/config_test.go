@@ -47,6 +47,18 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.RequeueInterval != 30*time.Second {
 		t.Errorf("expected RequeueInterval=30s, got %v", cfg.RequeueInterval)
 	}
+	if cfg.MaxLogBytes != 32768 {
+		t.Errorf("expected MaxLogBytes=32768, got %d", cfg.MaxLogBytes)
+	}
+	if cfg.MaxLogLines != 200 {
+		t.Errorf("expected MaxLogLines=200, got %d", cfg.MaxLogLines)
+	}
+	if cfg.MaxEventsPerIncident != 25 {
+		t.Errorf("expected MaxEventsPerIncident=25, got %d", cfg.MaxEventsPerIncident)
+	}
+	if cfg.EvidenceCollectionTimeout != 30*time.Second {
+		t.Errorf("expected EvidenceCollectionTimeout=30s, got %v", cfg.EvidenceCollectionTimeout)
+	}
 	if cfg.WatchNamespaces == nil {
 		t.Error("expected WatchNamespaces to be non-nil empty slice, got nil")
 	}
@@ -153,6 +165,31 @@ func TestValidate(t *testing.T) {
 				c.RequeueInterval = 5 * time.Minute
 			},
 			wantErr: false,
+		},
+		{
+			name:    "zero MaxLogBytes is invalid",
+			mutate:  func(c *config.Config) { c.MaxLogBytes = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "negative MaxLogBytes is invalid",
+			mutate:  func(c *config.Config) { c.MaxLogBytes = -1 },
+			wantErr: true,
+		},
+		{
+			name:    "zero MaxLogLines is invalid",
+			mutate:  func(c *config.Config) { c.MaxLogLines = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "zero MaxEventsPerIncident is invalid",
+			mutate:  func(c *config.Config) { c.MaxEventsPerIncident = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "zero EvidenceCollectionTimeout is invalid",
+			mutate:  func(c *config.Config) { c.EvidenceCollectionTimeout = 0 },
+			wantErr: true,
 		},
 	}
 

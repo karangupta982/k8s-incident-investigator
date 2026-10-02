@@ -182,6 +182,568 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              evidence:
+                description: |-
+                  Evidence holds the collected investigation evidence.
+                  Populated after initial trigger detection; refreshed on subsequent reconciliations.
+                properties:
+                  collectedAt:
+                    description: CollectedAt is the time evidence collection last
+                      completed (or was interrupted).
+                    format: date-time
+                    type: string
+                  collectionErrors:
+                    description: CollectionErrors records sources that could not be
+                      collected and why.
+                    items:
+                      description: CollectionError records a source that could not
+                        be collected and why.
+                      properties:
+                        reason:
+                          description: Reason is a human-readable description of the
+                            failure.
+                          type: string
+                        source:
+                          description: |-
+                            Source identifies which evidence source failed
+                            (e.g., "pod", "events", "node", "workload", "logs/my-container", "pvc/my-pvc").
+                          type: string
+                      required:
+                      - reason
+                      - source
+                      type: object
+                    type: array
+                  dependencies:
+                    description: Dependencies holds evidence about workload dependencies
+                      relevant to the trigger type.
+                    properties:
+                      imagePullSecretNames:
+                        description: |-
+                          ImagePullSecretNames holds the names of ImagePullSecrets referenced by the Pod.
+                          Values (secret data) are never stored.
+                          Populated for ImagePullBackOff triggers.
+                        items:
+                          type: string
+                        type: array
+                      pvcs:
+                        description: |-
+                          PVCs holds evidence for PersistentVolumeClaims referenced by the affected Pod.
+                          Populated for MountFailure triggers.
+                        items:
+                          description: PVCEvidence holds evidence about a PersistentVolumeClaim.
+                          properties:
+                            accessModes:
+                              description: AccessModes is the list of access modes
+                                requested by the PVC.
+                              items:
+                                type: string
+                              type: array
+                            boundPVName:
+                              description: BoundPVName is the name of the PersistentVolume
+                                the PVC is bound to.
+                              type: string
+                            name:
+                              description: Name is the PVC name.
+                              type: string
+                            namespace:
+                              description: Namespace is the PVC namespace.
+                              type: string
+                            phase:
+                              description: 'Phase is the PVC phase: Pending, Bound,
+                                Lost.'
+                              type: string
+                            pvReclaimPolicy:
+                              description: PVReclaimPolicy is the reclaim policy of
+                                the bound PersistentVolume.
+                              type: string
+                            requestedStorage:
+                              description: RequestedStorage is the storage capacity
+                                requested by the PVC.
+                              type: string
+                            storageClassName:
+                              description: StorageClassName is the storage class used
+                                by the PVC.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          - phase
+                          type: object
+                        type: array
+                      schedulingConstraints:
+                        description: |-
+                          SchedulingConstraints holds scheduling-relevant Pod spec fields.
+                          Populated for SchedulingFailure triggers.
+                        properties:
+                          nodeSelector:
+                            additionalProperties:
+                              type: string
+                            description: NodeSelector holds the Pod's nodeSelector
+                              labels.
+                            type: object
+                          resourceRequests:
+                            additionalProperties:
+                              type: string
+                            description: ResourceRequests holds aggregated resource
+                              requests across all containers.
+                            type: object
+                          tolerations:
+                            description: Tolerations holds the Pod's tolerations as
+                              strings (key=value:effect).
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                    type: object
+                  events:
+                    description: Events is a bounded list of relevant Kubernetes Events.
+                    items:
+                      description: EventEvidence holds evidence from a single Kubernetes
+                        Event.
+                      properties:
+                        count:
+                          description: Count is the number of times this event has
+                            occurred.
+                          format: int32
+                          type: integer
+                        firstTime:
+                          description: FirstTime is when the event was first observed.
+                          format: date-time
+                          type: string
+                        involvedObjectKind:
+                          description: InvolvedObjectKind is the kind of the object
+                            this event refers to.
+                          type: string
+                        involvedObjectName:
+                          description: InvolvedObjectName is the name of the object
+                            this event refers to.
+                          type: string
+                        lastTime:
+                          description: LastTime is when the event was most recently
+                            observed.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is the human-readable event message,
+                            truncated to 256 characters.
+                          type: string
+                        reason:
+                          description: Reason is the short machine-readable reason
+                            string (e.g., OOMKilled, FailedMount).
+                          type: string
+                      required:
+                      - count
+                      - involvedObjectKind
+                      - involvedObjectName
+                      - message
+                      - reason
+                      type: object
+                    type: array
+                  logs:
+                    description: Logs holds bounded container log excerpts.
+                    items:
+                      description: ContainerLogEvidence holds a bounded excerpt of
+                        a container's logs.
+                      properties:
+                        containerName:
+                          description: ContainerName is the container whose logs were
+                            collected.
+                          type: string
+                        isPrevious:
+                          description: IsPrevious indicates whether these are logs
+                            from the previous container instance.
+                          type: boolean
+                        lines:
+                          description: Lines holds the individual log lines collected.
+                          items:
+                            type: string
+                          type: array
+                        truncated:
+                          description: Truncated is true when the log was cut short
+                            due to byte or line limits.
+                          type: boolean
+                        unavailableReason:
+                          description: |-
+                            UnavailableReason describes why logs could not be retrieved.
+                            Empty when logs were retrieved successfully.
+                          type: string
+                      required:
+                      - containerName
+                      - isPrevious
+                      - truncated
+                      type: object
+                    type: array
+                  node:
+                    description: Node holds evidence from the node the affected Pod
+                      ran on.
+                    properties:
+                      allocatableCPU:
+                        description: AllocatableCPU is the node's allocatable CPU
+                          in millicores as a string.
+                        type: string
+                      allocatableMemory:
+                        description: AllocatableMemory is the node's allocatable memory
+                          as a human-readable string.
+                        type: string
+                      diskPressure:
+                        description: DiskPressure is the DiskPressure condition status.
+                        type: string
+                      kernelVersion:
+                        description: KernelVersion is the node's kernel version string.
+                        type: string
+                      memoryPressure:
+                        description: MemoryPressure is the MemoryPressure condition
+                          status.
+                        type: string
+                      name:
+                        description: Name is the node name.
+                        type: string
+                      networkUnavailable:
+                        description: NetworkUnavailable is the NetworkUnavailable
+                          condition status.
+                        type: string
+                      pidPressure:
+                        description: PIDPressure is the PIDPressure condition status.
+                        type: string
+                      ready:
+                        description: 'Ready is the node''s Ready condition status:
+                          "True", "False", or "Unknown".'
+                        type: string
+                    required:
+                    - diskPressure
+                    - memoryPressure
+                    - name
+                    - pidPressure
+                    - ready
+                    type: object
+                  pod:
+                    description: Pod holds evidence from the primary affected Pod.
+                    properties:
+                      containers:
+                        description: Containers holds per-container state evidence.
+                        items:
+                          description: ContainerEvidence holds state evidence for
+                            one container.
+                          properties:
+                            exitCode:
+                              description: |-
+                                ExitCode is the exit code from the most recent termination.
+                                Zero when the container has not yet terminated.
+                              format: int32
+                              type: integer
+                            image:
+                              description: Image is the full image reference.
+                              type: string
+                            lastTerminationReason:
+                              description: LastTerminationReason is the reason from
+                                the previous termination, if any.
+                              type: string
+                            livenessProbe:
+                              description: LivenessProbe summarises the liveness probe
+                                configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            name:
+                              description: Name is the container name.
+                              type: string
+                            readinessProbe:
+                              description: ReadinessProbe summarises the readiness
+                                probe configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            resourceLimits:
+                              additionalProperties:
+                                type: string
+                              description: ResourceLimits holds the configured resource
+                                limits for this container.
+                              type: object
+                            resourceRequests:
+                              additionalProperties:
+                                type: string
+                              description: ResourceRequests holds the configured resource
+                                requests for this container.
+                              type: object
+                            restartCount:
+                              description: RestartCount is the number of times the
+                                container has been restarted.
+                              format: int32
+                              type: integer
+                            state:
+                              description: 'State is the current container state:
+                                running, waiting, or terminated.'
+                              type: string
+                            terminationReason:
+                              description: TerminationReason is the reason for the
+                                most recent termination (e.g., OOMKilled, Error).
+                              type: string
+                            waitingReason:
+                              description: WaitingReason is the Waiting.Reason when
+                                state is "waiting".
+                              type: string
+                          required:
+                          - image
+                          - name
+                          - restartCount
+                          - state
+                          type: object
+                        type: array
+                      initContainers:
+                        description: InitContainers holds per-init-container state
+                          evidence.
+                        items:
+                          description: ContainerEvidence holds state evidence for
+                            one container.
+                          properties:
+                            exitCode:
+                              description: |-
+                                ExitCode is the exit code from the most recent termination.
+                                Zero when the container has not yet terminated.
+                              format: int32
+                              type: integer
+                            image:
+                              description: Image is the full image reference.
+                              type: string
+                            lastTerminationReason:
+                              description: LastTerminationReason is the reason from
+                                the previous termination, if any.
+                              type: string
+                            livenessProbe:
+                              description: LivenessProbe summarises the liveness probe
+                                configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            name:
+                              description: Name is the container name.
+                              type: string
+                            readinessProbe:
+                              description: ReadinessProbe summarises the readiness
+                                probe configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            resourceLimits:
+                              additionalProperties:
+                                type: string
+                              description: ResourceLimits holds the configured resource
+                                limits for this container.
+                              type: object
+                            resourceRequests:
+                              additionalProperties:
+                                type: string
+                              description: ResourceRequests holds the configured resource
+                                requests for this container.
+                              type: object
+                            restartCount:
+                              description: RestartCount is the number of times the
+                                container has been restarted.
+                              format: int32
+                              type: integer
+                            state:
+                              description: 'State is the current container state:
+                                running, waiting, or terminated.'
+                              type: string
+                            terminationReason:
+                              description: TerminationReason is the reason for the
+                                most recent termination (e.g., OOMKilled, Error).
+                              type: string
+                            waitingReason:
+                              description: WaitingReason is the Waiting.Reason when
+                                state is "waiting".
+                              type: string
+                          required:
+                          - image
+                          - name
+                          - restartCount
+                          - state
+                          type: object
+                        type: array
+                      name:
+                        description: Name is the Pod name.
+                        type: string
+                      namespace:
+                        description: Namespace is the Pod namespace.
+                        type: string
+                      nodeName:
+                        description: NodeName is the node the Pod was scheduled on.
+                        type: string
+                      phase:
+                        description: Phase is the Pod phase at collection time.
+                        type: string
+                      volumeMounts:
+                        description: VolumeMounts holds volumes relevant to the trigger
+                          type.
+                        items:
+                          description: VolumeMountEvidence captures a volume mount
+                            relevant to the incident.
+                          properties:
+                            claimName:
+                              description: ClaimName is the PVC name when VolumeType
+                                is PVC.
+                              type: string
+                            mountPath:
+                              description: MountPath is the path inside the container.
+                              type: string
+                            name:
+                              description: Name is the volume name.
+                              type: string
+                            volumeType:
+                              description: VolumeType is the backing volume type (PVC,
+                                ConfigMap, Secret, EmptyDir, etc.).
+                              type: string
+                          required:
+                          - mountPath
+                          - name
+                          - volumeType
+                          type: object
+                        type: array
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  workload:
+                    description: Workload holds evidence from the owning workload
+                      resource.
+                    properties:
+                      conditions:
+                        description: Conditions holds the workload's status conditions
+                          (capped at 10).
+                        items:
+                          description: WorkloadCondition captures one condition from
+                            the workload's status.
+                          properties:
+                            lastTransitionTime:
+                              description: LastTransitionTime is when the condition
+                                last changed.
+                              format: date-time
+                              type: string
+                            message:
+                              description: Message is the human-readable condition
+                                message.
+                              type: string
+                            reason:
+                              description: Reason is the machine-readable reason string.
+                              type: string
+                            status:
+                              description: Status is "True", "False", or "Unknown".
+                              type: string
+                            type:
+                              description: Type is the condition type.
+                              type: string
+                          required:
+                          - status
+                          - type
+                          type: object
+                        type: array
+                      desiredReplicas:
+                        description: DesiredReplicas is the configured replica count.
+                        format: int32
+                        type: integer
+                      kind:
+                        description: Kind is the workload type.
+                        type: string
+                      name:
+                        description: Name is the workload name.
+                        type: string
+                      namespace:
+                        description: Namespace is the workload namespace.
+                        type: string
+                      readyReplicas:
+                        description: ReadyReplicas is the current ready replica count.
+                        format: int32
+                        type: integer
+                      updateStrategy:
+                        description: UpdateStrategy is the update strategy type (e.g.,
+                          RollingUpdate, Recreate, OnDelete).
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    - namespace
+                    type: object
+                type: object
               failureCount:
                 description: |-
                   FailureCount tracks the number of distinct failure observations associated with this
