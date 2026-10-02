@@ -1,0 +1,32 @@
+# OOMKilled scenario: container allocates 200MB but limit is 64Mi.
+# This immediately triggers OOMKilled → the investigator detects it and
+# creates an IncidentReport with Phase=Diagnosed, RuleID=OOMMemoryLimit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oom-crasher
+  namespace: demo-oom-killed
+  labels:
+    app: oom-crasher
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oom-crasher
+  template:
+    metadata:
+      labels:
+        app: oom-crasher
+    spec:
+      containers:
+      - name: crasher
+        image: polinux/stress
+        args: ["--vm", "1", "--vm-bytes", "200M", "--vm-hang", "0"]
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "32Mi"
+            cpu: "10m"

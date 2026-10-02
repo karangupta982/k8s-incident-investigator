@@ -1,0 +1,13 @@
+# PVC using the fake StorageClass — will remain Pending indefinitely.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-data
+  namespace: demo-mount-failure
+spec:
+  storageClassName: fake-storage-investigator-demo
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

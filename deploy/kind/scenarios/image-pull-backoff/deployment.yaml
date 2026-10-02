@@ -1,0 +1,32 @@
+# ImagePullBackOff scenario: references an image that does not exist.
+# Kubernetes cannot pull it, triggering ImagePullBackOff immediately.
+# The investigator diagnoses this as ImagePullFailure (High confidence).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-pull-fail
+  namespace: demo-image-pull
+  labels:
+    app: image-pull-fail
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-pull-fail
+  template:
+    metadata:
+      labels:
+        app: image-pull-fail
+    spec:
+      containers:
+      - name: app
+        # Deliberately invalid image name — no such registry or tag exists
+        image: this-image-does-not-exist-investigator-demo:v0.0.0-invalid
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
