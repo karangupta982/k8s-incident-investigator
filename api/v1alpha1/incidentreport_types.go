@@ -80,6 +80,11 @@ type IncidentReportStatus struct {
 	// +optional
 	LastFailureAt *metav1.Time `json:"lastFailureAt,omitempty"`
 
+	// Evidence holds the collected investigation evidence.
+	// Populated after initial trigger detection; refreshed on subsequent reconciliations.
+	// +optional
+	Evidence *EvidenceSnapshot `json:"evidence,omitempty"`
+
 	// Conditions provides standard Kubernetes condition semantics for the incident state.
 	// +optional
 	// +listType=map
