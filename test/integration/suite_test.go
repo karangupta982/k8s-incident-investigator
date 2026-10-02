@@ -41,6 +41,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/metrics"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
@@ -128,6 +129,7 @@ var _ = BeforeSuite(func() {
 		EvidCorrelator:       evCorrelator,
 		DiagnosisEngine:      diagEngine,
 		ReportingEngine:      reportEngine,
+		Metrics:              &metrics.NoOpRecorder{},
 		Log:                  log,
 	}
 	Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
