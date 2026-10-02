@@ -1,0 +1,9 @@
+# Fake StorageClass: uses a provisioner that does not exist in the cluster.
+# PVCs using this class will remain in Pending phase indefinitely.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fake-storage-investigator-demo
+provisioner: fake.provisioner.does.not.exist/investigator-demo
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
