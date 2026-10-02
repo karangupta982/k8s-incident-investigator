@@ -108,6 +108,10 @@ func (o *EvidenceOrchestrator) Collect(
 	snapshot := v1alpha1.EvidenceSnapshot{
 		CollectedAt: &now,
 	}
+	// Propagate trigger type so diagnosis rules can inspect it without accessing the IncidentReport.
+	if report.Status.Trigger != nil {
+		snapshot.TriggerType = string(report.Status.Trigger.Type)
+	}
 
 	// Determine which trigger type we are dealing with.
 	var triggerType v1alpha1.TriggerType

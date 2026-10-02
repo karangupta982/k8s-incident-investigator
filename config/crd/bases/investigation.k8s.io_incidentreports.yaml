@@ -267,6 +267,163 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              diagnosis:
+                description: |-
+                  Diagnosis holds the result of the diagnosis engine evaluation.
+                  Set after evidence collection; replaced on each reconciliation cycle.
+                properties:
+                  alternativeHypotheses:
+                    description: |-
+                      AlternativeHypotheses lists rules that matched at the same confidence level as the
+                      primary finding, representing plausible alternative explanations.
+                    items:
+                      description: DiagnosisFinding represents a single rule match
+                        with its evidence-backed explanation.
+                      properties:
+                        cause:
+                          description: Cause is a concise human-readable description
+                            of the identified root cause.
+                          type: string
+                        confidence:
+                          description: Confidence is the qualitative strength of this
+                            finding.
+                          enum:
+                          - High
+                          - Medium
+                          - Low
+                          type: string
+                        explanation:
+                          description: Explanation provides a longer evidence-backed
+                            description of why this finding was reached.
+                          type: string
+                        recommendation:
+                          description: |-
+                            Recommendation is a short, actionable suggestion tied directly to this finding.
+                            Must be specific and evidence-backed; must not recommend automatic remediation.
+                          type: string
+                        ruleID:
+                          description: RuleID is the identifier of the rule that produced
+                            this finding (e.g., "OOMMemoryLimit").
+                          type: string
+                        supportingEvidence:
+                          description: |-
+                            SupportingEvidence lists the specific evidence items that led to this finding.
+                            Each entry is a short human-readable string.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - cause
+                      - confidence
+                      - explanation
+                      - ruleID
+                      type: object
+                    type: array
+                  contributingFactors:
+                    description: |-
+                      ContributingFactors lists other rules that fired alongside the primary finding
+                      at a lower confidence level.
+                    items:
+                      description: DiagnosisFinding represents a single rule match
+                        with its evidence-backed explanation.
+                      properties:
+                        cause:
+                          description: Cause is a concise human-readable description
+                            of the identified root cause.
+                          type: string
+                        confidence:
+                          description: Confidence is the qualitative strength of this
+                            finding.
+                          enum:
+                          - High
+                          - Medium
+                          - Low
+                          type: string
+                        explanation:
+                          description: Explanation provides a longer evidence-backed
+                            description of why this finding was reached.
+                          type: string
+                        recommendation:
+                          description: |-
+                            Recommendation is a short, actionable suggestion tied directly to this finding.
+                            Must be specific and evidence-backed; must not recommend automatic remediation.
+                          type: string
+                        ruleID:
+                          description: RuleID is the identifier of the rule that produced
+                            this finding (e.g., "OOMMemoryLimit").
+                          type: string
+                        supportingEvidence:
+                          description: |-
+                            SupportingEvidence lists the specific evidence items that led to this finding.
+                            Each entry is a short human-readable string.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - cause
+                      - confidence
+                      - explanation
+                      - ruleID
+                      type: object
+                    type: array
+                  evaluatedAt:
+                    description: EvaluatedAt is the timestamp when diagnosis was last
+                      run.
+                    format: date-time
+                    type: string
+                  primary:
+                    description: |-
+                      Primary is the highest-confidence matching diagnosis finding.
+                      Nil when no rule matched (phase will be Unknown).
+                    properties:
+                      cause:
+                        description: Cause is a concise human-readable description
+                          of the identified root cause.
+                        type: string
+                      confidence:
+                        description: Confidence is the qualitative strength of this
+                          finding.
+                        enum:
+                        - High
+                        - Medium
+                        - Low
+                        type: string
+                      explanation:
+                        description: Explanation provides a longer evidence-backed
+                          description of why this finding was reached.
+                        type: string
+                      recommendation:
+                        description: |-
+                          Recommendation is a short, actionable suggestion tied directly to this finding.
+                          Must be specific and evidence-backed; must not recommend automatic remediation.
+                        type: string
+                      ruleID:
+                        description: RuleID is the identifier of the rule that produced
+                          this finding (e.g., "OOMMemoryLimit").
+                        type: string
+                      supportingEvidence:
+                        description: |-
+                          SupportingEvidence lists the specific evidence items that led to this finding.
+                          Each entry is a short human-readable string.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - cause
+                    - confidence
+                    - explanation
+                    - ruleID
+                    type: object
+                  rulesEvaluated:
+                    description: RulesEvaluated is the count of rules that were evaluated.
+                    type: integer
+                  unknownReason:
+                    description: UnknownReason explains why no diagnosis was made
+                      when Primary is nil.
+                    type: string
+                required:
+                - rulesEvaluated
+                type: object
               evidence:
                 description: |-
                   Evidence holds the collected investigation evidence.
@@ -768,6 +925,12 @@ spec:
                     - name
                     - namespace
                     type: object
+                  triggerType:
+                    description: |-
+                      TriggerType is the classified failure signal that initiated this investigation.
+                      Set by the EvidenceOrchestrator from IncidentReport.Status.Trigger.Type so that
+                      diagnosis rules can inspect it without accessing the IncidentReport directly.
+                    type: string
                   workload:
                     description: Workload holds evidence from the owning workload
                       resource.
