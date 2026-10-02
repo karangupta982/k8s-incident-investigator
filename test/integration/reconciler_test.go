@@ -247,26 +247,6 @@ func waitForIncidentReportByNameWithTouch(ctx context.Context, name, namespace, 
 	}, timeout, 500*time.Millisecond).Should(BeTrue(), "expected IncidentReport %s/%s to exist", namespace, name)
 }
 
-// waitForIncidentPhase polls until the IncidentReport reaches the expected phase.
-// Periodically touches the pod to drive reconciliation.
-func waitForIncidentPhase(ctx context.Context, name, namespace, podName string, phase v1alpha1.IncidentPhase, timeout time.Duration) {
-	touchCount := 0
-	Eventually(func() v1alpha1.IncidentPhase {
-		report := &v1alpha1.IncidentReport{}
-		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, report); err != nil {
-			return ""
-		}
-		if report.Status.Phase == phase {
-			return phase
-		}
-		touchCount++
-		if touchCount%2 == 0 && podName != "" {
-			touchPodAnnotation(ctx, podName, namespace, fmt.Sprintf("phase-%d", touchCount))
-		}
-		return report.Status.Phase
-	}, timeout, 500*time.Millisecond).Should(Equal(phase), "IncidentReport %s/%s did not reach phase %s", namespace, name, phase)
-}
-
 // countActiveIncidentReports counts IncidentReports whose name ends with "-active".
 func countActiveIncidentReports(ctx context.Context, namespace string) int {
 	list := &v1alpha1.IncidentReportList{}
