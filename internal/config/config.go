@@ -54,6 +54,22 @@ type Config struct {
 
 	// RequeueInterval is how often active incidents are re-evaluated. Default: 30s.
 	RequeueInterval time.Duration
+
+	// MaxLogBytes is the maximum number of bytes collected per container log excerpt.
+	// Default: 32768 (32 KB).
+	MaxLogBytes int
+
+	// MaxLogLines is the maximum number of lines collected per container log excerpt.
+	// Default: 200.
+	MaxLogLines int
+
+	// MaxEventsPerIncident is the maximum number of Kubernetes Events stored in evidence.
+	// Default: 25.
+	MaxEventsPerIncident int
+
+	// EvidenceCollectionTimeout is the maximum duration for a single evidence collection cycle.
+	// Default: 30 seconds.
+	EvidenceCollectionTimeout time.Duration
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -67,6 +83,10 @@ func DefaultConfig() *Config {
 		MountFailureThreshold:          3,
 		SchedulingFailureThreshold:     5,
 		RequeueInterval:                30 * time.Second,
+		MaxLogBytes:                    32768,
+		MaxLogLines:                    200,
+		MaxEventsPerIncident:           25,
+		EvidenceCollectionTimeout:      30 * time.Second,
 	}
 }
 
@@ -93,6 +113,18 @@ func (c *Config) Validate() error {
 	}
 	if c.RequeueInterval <= 0 {
 		return fmt.Errorf("requeueInterval must be positive, got %v", c.RequeueInterval)
+	}
+	if c.MaxLogBytes <= 0 {
+		return fmt.Errorf("maxLogBytes must be positive, got %d", c.MaxLogBytes)
+	}
+	if c.MaxLogLines <= 0 {
+		return fmt.Errorf("maxLogLines must be positive, got %d", c.MaxLogLines)
+	}
+	if c.MaxEventsPerIncident <= 0 {
+		return fmt.Errorf("maxEventsPerIncident must be positive, got %d", c.MaxEventsPerIncident)
+	}
+	if c.EvidenceCollectionTimeout <= 0 {
+		return fmt.Errorf("evidenceCollectionTimeout must be positive, got %v", c.EvidenceCollectionTimeout)
 	}
 	return nil
 }

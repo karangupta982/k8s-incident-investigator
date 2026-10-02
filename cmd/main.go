@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -43,6 +44,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/controller"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
 
@@ -82,6 +84,12 @@ func main() {
 	flag.IntVar(&schedulingThreshold, "scheduling-threshold", 5, "Event.count threshold for scheduling failures.")
 	flag.DurationVar(&requeueInterval, "requeue-interval", 30*time.Second, "Interval for re-evaluating active incidents.")
 	flag.StringVar(&watchNamespaces, "watch-namespaces", "", "Comma-separated list of namespaces to watch. Empty = all namespaces.")
+	var maxLogBytes, maxLogLines, maxEventsPerIncident int
+	var evidenceTimeout time.Duration
+	flag.IntVar(&maxLogBytes, "max-log-bytes", 32768, "Maximum bytes per container log excerpt.")
+	flag.IntVar(&maxLogLines, "max-log-lines", 200, "Maximum lines per container log excerpt.")
+	flag.IntVar(&maxEventsPerIncident, "max-events", 25, "Maximum Kubernetes Events stored in evidence per incident.")
+	flag.DurationVar(&evidenceTimeout, "evidence-timeout", 30*time.Second, "Timeout for evidence collection per reconcile cycle.")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -98,6 +106,10 @@ func main() {
 		MountFailureThreshold:          mountThreshold,
 		SchedulingFailureThreshold:     schedulingThreshold,
 		RequeueInterval:                requeueInterval,
+		MaxLogBytes:                    maxLogBytes,
+		MaxLogLines:                    maxLogLines,
+		MaxEventsPerIncident:           maxEventsPerIncident,
+		EvidenceCollectionTimeout:      evidenceTimeout,
 	}
 	if watchNamespaces != "" {
 		for _, ns := range strings.Split(watchNamespaces, ",") {
@@ -139,16 +151,30 @@ func main() {
 
 	log := ctrl.Log.WithName("controller")
 
+	kubeClient, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create kubernetes client for evidence collection")
+		os.Exit(1)
+	}
+
+	evOrchestrator := &evidence.EvidenceOrchestrator{
+		Client:     mgr.GetClient(),
+		KubeClient: kubeClient,
+		Config:     cfg,
+		Log:        log,
+	}
+
 	reconciler := &controller.PodReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Config:            cfg,
-		TriggerEvaluator:  investigation.NewTriggerEvaluator(),
-		OwnershipResolver: investigation.NewOwnershipResolver(mgr.GetClient(), log),
-		Correlator:        investigation.NewIncidentCorrelator(mgr.GetClient(), log),
-		RecoveryEvaluator: investigation.NewRecoveryEvaluator(),
-		Transitioner:      investigation.NewResolutionTransitioner(mgr.GetClient(), log),
-		Log:               log,
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Config:               cfg,
+		TriggerEvaluator:     investigation.NewTriggerEvaluator(),
+		OwnershipResolver:    investigation.NewOwnershipResolver(mgr.GetClient(), log),
+		Correlator:           investigation.NewIncidentCorrelator(mgr.GetClient(), log),
+		RecoveryEvaluator:    investigation.NewRecoveryEvaluator(),
+		Transitioner:         investigation.NewResolutionTransitioner(mgr.GetClient(), log),
+		EvidenceOrchestrator: evOrchestrator,
+		Log:                  log,
 	}
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {

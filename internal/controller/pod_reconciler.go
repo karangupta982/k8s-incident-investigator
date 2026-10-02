@@ -40,6 +40,7 @@ import (
 
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
 
@@ -58,16 +59,21 @@ import (
 // +kubebuilder:rbac:groups=investigation.k8s.io,resources=incidentreports,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=investigation.k8s.io,resources=incidentreports/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=investigation.k8s.io,resources=incidentreports/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 type PodReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	Config            *config.Config
-	TriggerEvaluator  investigation.TriggerEvaluatorInterface
-	OwnershipResolver investigation.OwnershipResolverInterface
-	Correlator        investigation.IncidentCorrelatorInterface
-	RecoveryEvaluator investigation.RecoveryEvaluatorInterface
-	Transitioner      *investigation.ResolutionTransitioner
-	Log               logr.Logger
+	Scheme               *runtime.Scheme
+	Config               *config.Config
+	TriggerEvaluator     investigation.TriggerEvaluatorInterface
+	OwnershipResolver    investigation.OwnershipResolverInterface
+	Correlator           investigation.IncidentCorrelatorInterface
+	RecoveryEvaluator    investigation.RecoveryEvaluatorInterface
+	Transitioner         *investigation.ResolutionTransitioner
+	EvidenceOrchestrator *evidence.EvidenceOrchestrator
+	Log                  logr.Logger
 }
 
 // SetupWithManager registers the controller with the manager and configures watches.
@@ -254,12 +260,26 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, fmt.Errorf("updating incident status for pod %s: %w", req.NamespacedName, err)
 	}
 
-	// Re-fetch the report to get the latest resourceVersion before recovery evaluation.
+	// Re-fetch the report to get the latest resourceVersion before evidence collection.
 	var updatedReport v1alpha1.IncidentReport
 	if err := r.Get(ctx, types.NamespacedName{Namespace: report.Namespace, Name: report.Name}, &updatedReport); err != nil {
 		return ctrl.Result{}, fmt.Errorf("re-fetching report after status update: %w", err)
 	}
 	report = &updatedReport
+
+	// ---- Step 9.5: Collect evidence ----
+	if r.EvidenceOrchestrator != nil {
+		collectCtx, collectCancel := context.WithTimeout(ctx, r.Config.EvidenceCollectionTimeout)
+		defer collectCancel()
+		snapshot := r.EvidenceOrchestrator.Collect(collectCtx, report, &pod)
+		evidenceBase := report.DeepCopy()
+		report.Status.Evidence = &snapshot
+		if patchErr := r.Status().Patch(ctx, report, client.MergeFrom(evidenceBase)); patchErr != nil {
+			log.Error(patchErr, "failed to patch evidence snapshot, will retry on next reconciliation")
+			// Non-fatal: restore the pre-patch report so recovery evaluation continues
+			report.Status.Evidence = nil
+		}
+	}
 
 	// ---- Step 10: Fetch WorkloadSnapshot for recovery evaluation ----
 	snapshot, snapshotErr := r.fetchWorkloadSnapshot(ctx, report)
