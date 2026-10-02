@@ -41,6 +41,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
 var (
@@ -112,6 +113,7 @@ var _ = BeforeSuite(func() {
 		EventCorrelationWindow: 5 * time.Minute,
 	}
 	diagEngine := diagnosis.NewDiagnosisEngine()
+	reportEngine := &reporting.ReportingEngine{Config: testCfg}
 
 	reconciler := &controller.PodReconciler{
 		Client:               mgr.GetClient(),
@@ -125,6 +127,7 @@ var _ = BeforeSuite(func() {
 		EvidenceOrchestrator: evOrchestrator,
 		EvidCorrelator:       evCorrelator,
 		DiagnosisEngine:      diagEngine,
+		ReportingEngine:      reportEngine,
 		Log:                  log,
 	}
 	Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
