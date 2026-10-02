@@ -182,16 +182,16 @@ func TestCausalSignals_OOMCrashLoop(t *testing.T) {
 
 // ── Log pattern tests ─────────────────────────────────────────────────────────
 
-func makeLogSnapshot(containerName, line string) *v1alpha1.EvidenceSnapshot {
+func makeLogSnapshot(line string) *v1alpha1.EvidenceSnapshot {
 	return &v1alpha1.EvidenceSnapshot{
 		Logs: []v1alpha1.ContainerLogEvidence{
-			{ContainerName: containerName, Lines: []string{line}},
+			{ContainerName: "app", Lines: []string{line}},
 		},
 	}
 }
 
 func TestLogPatterns_OOMString(t *testing.T) {
-	snap := makeLogSnapshot("app", "2026/01/01 Killed process due to memory")
+	snap := makeLogSnapshot("2026/01/01 Killed process due to memory")
 	result := correlator().Correlate(snap)
 
 	if !result.LogPatterns.ContainsOOMString {
@@ -203,7 +203,7 @@ func TestLogPatterns_OOMString(t *testing.T) {
 }
 
 func TestLogPatterns_ConnectionRefused(t *testing.T) {
-	snap := makeLogSnapshot("app", "dial tcp: connection refused")
+	snap := makeLogSnapshot("dial tcp: connection refused")
 	result := correlator().Correlate(snap)
 
 	if !result.LogPatterns.ContainsConnectionRefused {
@@ -212,7 +212,7 @@ func TestLogPatterns_ConnectionRefused(t *testing.T) {
 }
 
 func TestLogPatterns_PanicOrFatal(t *testing.T) {
-	snap := makeLogSnapshot("app", "panic: runtime error: index out of range")
+	snap := makeLogSnapshot("panic: runtime error: index out of range")
 	result := correlator().Correlate(snap)
 
 	if !result.LogPatterns.ContainsPanicOrFatal {
@@ -221,7 +221,7 @@ func TestLogPatterns_PanicOrFatal(t *testing.T) {
 }
 
 func TestLogPatterns_PermissionDenied(t *testing.T) {
-	snap := makeLogSnapshot("app", "open /etc/secret: permission denied")
+	snap := makeLogSnapshot("open /etc/secret: permission denied")
 	result := correlator().Correlate(snap)
 
 	if !result.LogPatterns.ContainsPermissionDenied {
@@ -230,7 +230,7 @@ func TestLogPatterns_PermissionDenied(t *testing.T) {
 }
 
 func TestLogPatterns_NoMatch(t *testing.T) {
-	snap := makeLogSnapshot("app", "server started on :8080")
+	snap := makeLogSnapshot("server started on :8080")
 	result := correlator().Correlate(snap)
 
 	if result.LogPatterns.ContainsOOMString || result.LogPatterns.ContainsConnectionRefused ||
