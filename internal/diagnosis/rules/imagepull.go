@@ -43,7 +43,7 @@ func (r *ImagePullFailureRule) Evaluate(snapshot *v1alpha1.EvidenceSnapshot) *v1
 			fmt.Sprintf("waiting reason: %s", c.WaitingReason),
 		}
 
-		rec := "Verify that the image reference is correct and the registry is reachable."
+		var rec string
 		if snapshot.Dependencies != nil && len(snapshot.Dependencies.ImagePullSecretNames) > 0 {
 			secrets := strings.Join(snapshot.Dependencies.ImagePullSecretNames, ", ")
 			ev = append(ev, fmt.Sprintf("imagePullSecrets: %s", secrets))
