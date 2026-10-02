@@ -85,6 +85,11 @@ type IncidentReportStatus struct {
 	// +optional
 	Evidence *EvidenceSnapshot `json:"evidence,omitempty"`
 
+	// Diagnosis holds the result of the diagnosis engine evaluation.
+	// Set after evidence collection; replaced on each reconciliation cycle.
+	// +optional
+	Diagnosis *DiagnosisResult `json:"diagnosis,omitempty"`
+
 	// CorrelatedEvidence holds derived signals computed from the EvidenceSnapshot.
 	// Updated after each evidence collection cycle.
 	// +optional
