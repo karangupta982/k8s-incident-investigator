@@ -40,6 +40,11 @@ type IncidentReportStatus struct {
 	// +optional
 	Phase IncidentPhase `json:"phase,omitempty"`
 
+	// Summary is a concise human-readable summary of the incident.
+	// Updated on every reconciliation cycle.
+	// +optional
+	Summary string `json:"summary,omitempty"`
+
 	// StartedAt is the time the incident was first detected.
 	// +optional
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
@@ -90,6 +95,11 @@ type IncidentReportStatus struct {
 	// +optional
 	Diagnosis *DiagnosisResult `json:"diagnosis,omitempty"`
 
+	// Timeline is a chronologically ordered list of significant events during the incident.
+	// Bounded by MaxTimelineEvents. Updated on every reconciliation cycle.
+	// +optional
+	Timeline []TimelineEvent `json:"timeline,omitempty"`
+
 	// CorrelatedEvidence holds derived signals computed from the EvidenceSnapshot.
 	// Updated after each evidence collection cycle.
 	// +optional
@@ -114,6 +124,7 @@ type IncidentReportStatus struct {
 // +kubebuilder:printcolumn:name="Trigger",type=string,JSONPath=".status.trigger.type"
 // +kubebuilder:printcolumn:name="Started",type=date,JSONPath=".status.startedAt"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Cause",type=string,JSONPath=".status.diagnosis.primary.cause",priority=1
 type IncidentReport struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

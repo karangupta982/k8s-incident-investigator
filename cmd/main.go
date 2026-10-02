@@ -48,6 +48,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
 var (
@@ -92,6 +93,8 @@ func main() {
 	flag.IntVar(&maxLogLines, "max-log-lines", 200, "Maximum lines per container log excerpt.")
 	flag.IntVar(&maxEventsPerIncident, "max-events", 25, "Maximum Kubernetes Events stored in evidence per incident.")
 	flag.DurationVar(&evidenceTimeout, "evidence-timeout", 30*time.Second, "Timeout for evidence collection per reconcile cycle.")
+	var maxTimelineEvents int
+	flag.IntVar(&maxTimelineEvents, "timeline-events", 50, "Maximum events in the incident timeline.")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -111,6 +114,7 @@ func main() {
 		MaxLogBytes:                    maxLogBytes,
 		MaxLogLines:                    maxLogLines,
 		MaxEventsPerIncident:           maxEventsPerIncident,
+		MaxTimelineEvents:              maxTimelineEvents,
 		EvidenceCollectionTimeout:      evidenceTimeout,
 	}
 	if watchNamespaces != "" {
@@ -172,6 +176,8 @@ func main() {
 
 	diagEngine := diagnosis.NewDiagnosisEngine()
 
+	reportEngine := &reporting.ReportingEngine{Config: cfg}
+
 	reconciler := &controller.PodReconciler{
 		Client:               mgr.GetClient(),
 		Scheme:               mgr.GetScheme(),
@@ -184,6 +190,7 @@ func main() {
 		EvidenceOrchestrator: evOrchestrator,
 		EvidCorrelator:       evCorrelator,
 		DiagnosisEngine:      diagEngine,
+		ReportingEngine:      reportEngine,
 		Log:                  log,
 	}
 

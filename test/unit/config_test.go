@@ -59,6 +59,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.EvidenceCollectionTimeout != 30*time.Second {
 		t.Errorf("expected EvidenceCollectionTimeout=30s, got %v", cfg.EvidenceCollectionTimeout)
 	}
+	if cfg.MaxTimelineEvents != 50 {
+		t.Errorf("expected MaxTimelineEvents=50, got %d", cfg.MaxTimelineEvents)
+	}
 	if cfg.WatchNamespaces == nil {
 		t.Error("expected WatchNamespaces to be non-nil empty slice, got nil")
 	}
@@ -189,6 +192,11 @@ func TestValidate(t *testing.T) {
 		{
 			name:    "zero EvidenceCollectionTimeout is invalid",
 			mutate:  func(c *config.Config) { c.EvidenceCollectionTimeout = 0 },
+			wantErr: true,
+		},
+		{
+			name:    "zero MaxTimelineEvents is invalid",
+			mutate:  func(c *config.Config) { c.MaxTimelineEvents = 0 },
 			wantErr: true,
 		},
 	}
