@@ -182,6 +182,91 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              correlatedEvidence:
+                description: |-
+                  CorrelatedEvidence holds derived signals computed from the EvidenceSnapshot.
+                  Updated after each evidence collection cycle.
+                properties:
+                  causalSignals:
+                    description: CausalSignals holds derived boolean and string signals
+                      from multi-source evidence.
+                    properties:
+                      containerHitConfiguredLimit:
+                        description: |-
+                          ContainerHitConfiguredLimit is true when OOMKilled occurred
+                          and the container had a configured memory limit.
+                        type: boolean
+                      mountFailureLinkedToPVC:
+                        description: |-
+                          MountFailureLinkedToPVC is true when FailedMount events exist
+                          and PVC evidence is present.
+                        type: boolean
+                      nodeMemoryPressureCoincident:
+                        description: |-
+                          NodeMemoryPressureCoincident is true when OOMKilled occurred
+                          while the node was reporting MemoryPressure=True.
+                        type: boolean
+                      oomKillCausedCrashLoop:
+                        description: |-
+                          OOMKillCausedCrashLoop is true when OOMKilled exit codes are detected
+                          alongside CrashLoopBackOff waiting state for the same container.
+                        type: boolean
+                      pvcIsUnbound:
+                        description: PVCIsUnbound is true when at least one referenced
+                          PVC is not in Bound phase.
+                        type: boolean
+                      schedulingConstraintsPresent:
+                        description: |-
+                          SchedulingConstraintsPresent is true when FailedScheduling events exist
+                          and scheduling constraints are present in the evidence.
+                        type: boolean
+                      unboundPVCNames:
+                        description: UnboundPVCNames lists the names of PVCs that
+                          are not Bound.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  chainPatterns:
+                    description: ChainPatterns lists identified causal event chain
+                      types.
+                    items:
+                      type: string
+                    type: array
+                  correlatedAt:
+                    description: CorrelatedAt is the timestamp when correlation last
+                      ran.
+                    format: date-time
+                    type: string
+                  logPatterns:
+                    description: LogPatterns holds patterns detected in container
+                      log lines.
+                    properties:
+                      containerWithPattern:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ContainerWithPattern maps pattern name to the first container name
+                          where the pattern was detected.
+                        type: object
+                      containsConnectionRefused:
+                        description: ContainsConnectionRefused is true when any log
+                          line contains a connection refused error.
+                        type: boolean
+                      containsOOMString:
+                        description: ContainsOOMString is true when any log line contains
+                          an OOM-related string.
+                        type: boolean
+                      containsPanicOrFatal:
+                        description: ContainsPanicOrFatal is true when any log line
+                          contains a panic or fatal error.
+                        type: boolean
+                      containsPermissionDenied:
+                        description: ContainsPermissionDenied is true when any log
+                          line contains a permission error.
+                        type: boolean
+                    type: object
+                type: object
               evidence:
                 description: |-
                   Evidence holds the collected investigation evidence.
