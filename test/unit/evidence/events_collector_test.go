@@ -47,11 +47,11 @@ func buildScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
-func makeEventForPod(podName, namespace, reason, message string, count int32, lastTime time.Time) *corev1.Event {
+func makeEventForPod(podName, reason, message string, count int32, lastTime time.Time) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s-%d", podName, reason, count),
-			Namespace: namespace,
+			Namespace: "default",
 		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind: "Pod",
@@ -68,7 +68,7 @@ func TestEventCollector_ReturnsEventsForPod(t *testing.T) {
 	s := buildScheme(t)
 	pod := makeBasePod("my-pod", "default")
 
-	evt := makeEventForPod("my-pod", "default", "OOMKilling", "container killed", 1, time.Now())
+	evt := makeEventForPod("my-pod", "OOMKilling", "container killed", 1, time.Now())
 	fc := fake.NewClientBuilder().WithScheme(s).WithObjects(evt).Build()
 
 	cfg := config.DefaultConfig()
@@ -102,7 +102,7 @@ func TestEventCollector_BoundsToMaxEventsPerIncident(t *testing.T) {
 	var objs []runtime.Object
 	base := time.Now()
 	for i := 0; i < 10; i++ {
-		objs = append(objs, makeEventForPod("bound-pod", "default", "TestEvent",
+		objs = append(objs, makeEventForPod("bound-pod", "TestEvent",
 			fmt.Sprintf("event %d", i), int32(i+1), base.Add(time.Duration(i)*time.Second)))
 	}
 	fc := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
@@ -125,7 +125,7 @@ func TestEventCollector_TruncatesLongMessage(t *testing.T) {
 	pod := makeBasePod("msg-pod", "default")
 	longMsg := strings.Repeat("x", 300)
 
-	evt := makeEventForPod("msg-pod", "default", "TestEvent", longMsg, 1, time.Now())
+	evt := makeEventForPod("msg-pod", "TestEvent", longMsg, 1, time.Now())
 	fc := fake.NewClientBuilder().WithScheme(s).WithObjects(evt).Build()
 
 	cfg := config.DefaultConfig()
@@ -178,7 +178,7 @@ func TestProperty4_EventCountIsBounded(t *testing.T) {
 
 		var objs []runtime.Object
 		for i := 0; i < n; i++ {
-			objs = append(objs, makeEventForPod("prop-pod", "default", "TestEvent",
+			objs = append(objs, makeEventForPod("prop-pod", "TestEvent",
 				fmt.Sprintf("msg %d", i), int32(i+1), base.Add(time.Duration(i)*time.Second)))
 		}
 		fc := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()

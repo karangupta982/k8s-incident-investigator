@@ -58,10 +58,6 @@ func makePVC(name, namespace string, phase corev1.PersistentVolumeClaimPhase) *c
 	}
 }
 
-func mountFailureNeeds() internalevidence.TriggerNeedsExported {
-	return internalevidence.TriggerNeedsExported{PVCEvidence: true}
-}
-
 func TestDependencyCollector_OOMKilled_ReturnsNil(t *testing.T) {
 	s := buildScheme(t)
 	fc := fake.NewClientBuilder().WithScheme(s).Build()
@@ -193,6 +189,7 @@ func TestProperty8_ImagePullSecretNamesOnly(t *testing.T) {
 
 		if ev == nil {
 			rt.Fatalf("expected non-nil DependencyEvidence for count=%d", count)
+			return // satisfy staticcheck: ev is checked above
 		}
 		if len(ev.ImagePullSecretNames) != count {
 			rt.Fatalf("expected %d secret names, got %d", count, len(ev.ImagePullSecretNames))
