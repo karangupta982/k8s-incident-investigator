@@ -82,14 +82,15 @@ var _ = Describe("Evidence Collection", func() {
 		ir := waitForActiveIncidentReport(ctx, "oom-ev-pod", namespace, 15*time.Second)
 		Expect(ir).NotTo(BeNil())
 
-		// Wait for phase to be set
-		Eventually(func() v1alpha1.IncidentPhase {
+		// Wait for an active phase (diagnosis may transition to Diagnosed/Unknown after evidence is collected)
+		Eventually(func() bool {
 			fresh := &v1alpha1.IncidentReport{}
 			if err := k8sClient.Get(ctx, types.NamespacedName{Name: ir.Name, Namespace: namespace}, fresh); err != nil {
-				return ""
+				return false
 			}
-			return fresh.Status.Phase
-		}, 10*time.Second, 200*time.Millisecond).Should(Equal(v1alpha1.PhaseInvestigating))
+			p := fresh.Status.Phase
+			return p == v1alpha1.PhaseInvestigating || p == v1alpha1.PhaseDiagnosed || p == v1alpha1.PhaseUnknown
+		}, 10*time.Second, 200*time.Millisecond).Should(BeTrue(), "phase should be an active phase")
 
 		// Wait for Evidence to be populated (evidence collection happens after status update)
 		Eventually(func() bool {

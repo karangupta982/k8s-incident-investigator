@@ -287,6 +287,14 @@ func countAllIncidentReports(ctx context.Context, namespace string) int {
 	return len(list.Items)
 }
 
+// isActivePhase returns true when the phase indicates an active (non-resolved) incident.
+// After diagnosis runs, active incidents may be in Investigating, Diagnosed, or Unknown.
+func isActivePhase(phase v1alpha1.IncidentPhase) bool {
+	return phase == v1alpha1.PhaseInvestigating ||
+		phase == v1alpha1.PhaseDiagnosed ||
+		phase == v1alpha1.PhaseUnknown
+}
+
 // ─── Task 12.2: OOMKilled Pod creates an IncidentReport ──────────────────────
 
 var _ = Describe("OOMKilled Pod creates an IncidentReport", func() {
@@ -322,14 +330,15 @@ var _ = Describe("OOMKilled Pod creates an IncidentReport", func() {
 				return ""
 			}
 			return fresh.Status.Phase
-		}, 10*time.Second, 200*time.Millisecond).Should(Equal(v1alpha1.PhaseInvestigating),
-			"IncidentReport phase should be Investigating")
+		}, 10*time.Second, 200*time.Millisecond).Should(Satisfy(func(p v1alpha1.IncidentPhase) bool {
+			return isActivePhase(p)
+		}), "IncidentReport phase should be an active phase (Investigating/Diagnosed/Unknown)")
 
 		// Re-fetch with current status for subsequent assertions.
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: ir.Name, Namespace: namespace}, ir)).To(Succeed())
 
-		// Phase must be Investigating.
-		Expect(ir.Status.Phase).To(Equal(v1alpha1.PhaseInvestigating))
+		// Phase must be an active phase (diagnosis may have moved it to Diagnosed or Unknown).
+		Expect(isActivePhase(ir.Status.Phase)).To(BeTrue(), "phase should be Investigating, Diagnosed, or Unknown")
 
 		// AffectedPods must contain the pod.
 		Expect(ir.Status.AffectedPods).NotTo(BeEmpty())
@@ -504,7 +513,14 @@ var _ = Describe("Recovery and stability period", func() {
 
 		// Wait for investigating phase.
 		activeName := investigation.GenerateActiveName("my-deploy", "Deployment")
-		waitForIncidentPhase(ctx, activeName, namespace, "my-pod", v1alpha1.PhaseInvestigating, 20*time.Second)
+		// Wait for an active phase (diagnosis may transition from Investigating to Diagnosed/Unknown)
+		Eventually(func() bool {
+			ir := &v1alpha1.IncidentReport{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: activeName, Namespace: namespace}, ir); err != nil {
+				return false
+			}
+			return isActivePhase(ir.Status.Phase)
+		}, 20*time.Second, 500*time.Millisecond).Should(BeTrue(), "IncidentReport should reach an active phase")
 
 		// Now make the Deployment healthy.
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "my-deploy", Namespace: namespace}, deploy)).To(Succeed())
@@ -692,7 +708,7 @@ var _ = Describe("Missing Pod during reconciliation", func() {
 		refreshed := &v1alpha1.IncidentReport{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: irName, Namespace: namespace}, refreshed)).
 			To(Succeed(), "IncidentReport should still exist after Pod deletion")
-		Expect(refreshed.Status.Phase).To(Equal(v1alpha1.PhaseInvestigating))
+		Expect(isActivePhase(refreshed.Status.Phase)).To(BeTrue(), "phase should be active")
 
 		// AffectedPods must still contain the deleted pod's reference.
 		found := false
@@ -885,7 +901,13 @@ var _ = Describe("Lifecycle transitions", func() {
 		createPodWithStatus(ctx, pod)
 
 		activeName := investigation.GenerateActiveName("my-deploy", "Deployment")
-		waitForIncidentPhase(ctx, activeName, namespace, "pod-first", v1alpha1.PhaseInvestigating, 20*time.Second)
+		Eventually(func() bool {
+			ir := &v1alpha1.IncidentReport{}
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: activeName, Namespace: namespace}, ir); err != nil {
+				return false
+			}
+			return isActivePhase(ir.Status.Phase)
+		}, 20*time.Second, 500*time.Millisecond).Should(BeTrue(), "IncidentReport should reach an active phase")
 
 		// Make deployment healthy so the incident resolves.
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "my-deploy", Namespace: namespace}, deploy)).To(Succeed())
@@ -951,8 +973,9 @@ var _ = Describe("Lifecycle transitions", func() {
 				return ""
 			}
 			return newIR.Status.Phase
-		}, 10*time.Second, 200*time.Millisecond).Should(Equal(v1alpha1.PhaseInvestigating),
-			"new active IncidentReport should have phase Investigating")
+		}, 10*time.Second, 200*time.Millisecond).Should(Satisfy(func(p v1alpha1.IncidentPhase) bool {
+			return isActivePhase(p)
+		}), "new active IncidentReport should have an active phase")
 	})
 
 	It("does not trigger an incident for a healthy Running Pod with zero event counts", func() {
@@ -1050,6 +1073,6 @@ var _ = Describe("Lifecycle transitions", func() {
 		// IncidentReport must still be Investigating.
 		refreshed := &v1alpha1.IncidentReport{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: irName, Namespace: namespace}, refreshed)).To(Succeed())
-		Expect(refreshed.Status.Phase).To(Equal(v1alpha1.PhaseInvestigating))
+		Expect(isActivePhase(refreshed.Status.Phase)).To(BeTrue(), "phase should be active")
 	})
 })

@@ -41,6 +41,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/correlation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
 )
@@ -75,6 +76,7 @@ type PodReconciler struct {
 	Transitioner         *investigation.ResolutionTransitioner
 	EvidenceOrchestrator *evidence.EvidenceOrchestrator
 	EvidCorrelator       *correlation.EvidenceCorrelator
+	DiagnosisEngine      *diagnosis.DiagnosisEngine
 	Log                  logr.Logger
 }
 
@@ -292,6 +294,20 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			log.Error(patchErr, "failed to patch correlated evidence, will retry on next reconciliation")
 			report.Status.CorrelatedEvidence = nil
 		}
+	}
+
+	// ---- Step 9.6: Run diagnosis engine ----
+	if r.DiagnosisEngine != nil && report.Status.Evidence != nil {
+		diagResult := r.DiagnosisEngine.Evaluate(report.Status.Evidence)
+		if applyErr := r.applyDiagnosis(ctx, report, diagResult); applyErr != nil {
+			return ctrl.Result{}, fmt.Errorf("applying diagnosis for %s: %w", report.Name, applyErr)
+		}
+		// Re-fetch after diagnosis patch to get updated resourceVersion.
+		var postDiagReport v1alpha1.IncidentReport
+		if err := r.Get(ctx, types.NamespacedName{Namespace: report.Namespace, Name: report.Name}, &postDiagReport); err != nil {
+			return ctrl.Result{}, fmt.Errorf("re-fetching report after diagnosis: %w", err)
+		}
+		report = &postDiagReport
 	}
 
 	// ---- Step 10: Fetch WorkloadSnapshot for recovery evaluation ----
@@ -670,4 +686,24 @@ func workloadString(w *v1alpha1.WorkloadRef) string {
 		return "<pod-level>"
 	}
 	return fmt.Sprintf("%s/%s/%s", w.Kind, w.Namespace, w.Name)
+}
+
+// applyDiagnosis patches the IncidentReport status with the diagnosis result and
+// transitions the phase to Diagnosed or Unknown. Never changes a Resolved incident.
+func (r *PodReconciler) applyDiagnosis(
+	ctx context.Context,
+	report *v1alpha1.IncidentReport,
+	result v1alpha1.DiagnosisResult,
+) error {
+	if report.Status.Phase == v1alpha1.PhaseResolved {
+		return nil
+	}
+	base := report.DeepCopy()
+	report.Status.Diagnosis = &result
+	if result.Primary != nil {
+		report.Status.Phase = v1alpha1.PhaseDiagnosed
+	} else {
+		report.Status.Phase = v1alpha1.PhaseUnknown
+	}
+	return r.Status().Patch(ctx, report, client.MergeFrom(base))
 }
