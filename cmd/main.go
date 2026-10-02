@@ -48,6 +48,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/metrics"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
@@ -191,6 +192,7 @@ func main() {
 		EvidCorrelator:       evCorrelator,
 		DiagnosisEngine:      diagEngine,
 		ReportingEngine:      reportEngine,
+		Metrics:              &metrics.Recorder{},
 		Log:                  log,
 	}
 

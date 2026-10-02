@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,6 +45,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/metrics"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
@@ -79,6 +81,7 @@ type PodReconciler struct {
 	EvidCorrelator       *correlation.EvidenceCorrelator
 	DiagnosisEngine      *diagnosis.DiagnosisEngine
 	ReportingEngine      *reporting.ReportingEngine
+	Metrics              metrics.RecorderInterface
 	Log                  logr.Logger
 }
 
@@ -254,6 +257,9 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				"name", report.Name,
 				"workload", workloadString(workload),
 				"triggerType", triggerResult.Type)
+			r.recordMetric(func(m metrics.RecorderInterface) {
+				m.RecordIncidentDetected(string(triggerResult.Type), pod.Namespace)
+			})
 		}
 	} else {
 		report = correlation.ExistingReport
@@ -274,6 +280,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	report = &updatedReport
 
 	// ---- Step 9.5: Collect evidence ----
+	start95 := time.Now()
 	if r.EvidenceOrchestrator != nil {
 		collectCtx, collectCancel := context.WithTimeout(ctx, r.Config.EvidenceCollectionTimeout)
 		defer collectCancel()
@@ -284,6 +291,18 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			log.Error(patchErr, "failed to patch evidence snapshot, will retry on next reconciliation")
 			// Non-fatal: restore the pre-patch report so recovery evaluation continues
 			report.Status.Evidence = nil
+			// Record evidence collection metrics
+			collectionDuration := time.Since(start95)
+			trigType := ""
+			if report.Status.Trigger != nil {
+				trigType = string(report.Status.Trigger.Type)
+			}
+			r.recordMetric(func(m metrics.RecorderInterface) {
+				m.RecordEvidenceCollectionDuration(trigType, collectionDuration.Seconds())
+				for _, cerr := range snapshot.CollectionErrors {
+					m.RecordEvidenceCollectionFailure(cerr.Source)
+				}
+			})
 		}
 	}
 
@@ -301,6 +320,21 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// ---- Step 9.6: Run diagnosis engine ----
 	if r.DiagnosisEngine != nil && report.Status.Evidence != nil {
 		diagResult := r.DiagnosisEngine.Evaluate(report.Status.Evidence)
+		r.recordMetric(func(m metrics.RecorderInterface) {
+			trigType := ""
+			if report.Status.Trigger != nil {
+				trigType = string(report.Status.Trigger.Type)
+			}
+			if diagResult.Primary != nil {
+				m.RecordDiagnosed(diagResult.Primary.RuleID, trigType)
+				m.RecordDiagnosisRuleMatch(diagResult.Primary.RuleID, diagResult.Primary.Confidence)
+			} else {
+				m.RecordUnknownDiagnosis(trigType)
+			}
+			for _, f := range diagResult.ContributingFactors {
+				m.RecordDiagnosisRuleMatch(f.RuleID, f.Confidence)
+			}
+		})
 		if applyErr := r.applyDiagnosis(ctx, report, diagResult); applyErr != nil {
 			return ctrl.Result{}, fmt.Errorf("applying diagnosis for %s: %w", report.Name, applyErr)
 		}
@@ -347,6 +381,18 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if transErr := r.Transitioner.Transition(ctx, report, now.Time); transErr != nil {
 			return ctrl.Result{}, fmt.Errorf("transitioning incident to resolved: %w", transErr)
 		}
+		r.recordMetric(func(m metrics.RecorderInterface) {
+			trigType := ""
+			if report.Status.Trigger != nil {
+				trigType = string(report.Status.Trigger.Type)
+			}
+			var dur float64
+			if report.Status.StartedAt != nil && report.Status.ResolvedAt != nil {
+				dur = report.Status.ResolvedAt.Sub(report.Status.StartedAt.Time).Seconds()
+			}
+			m.RecordInvestigationCompleted(trigType, dur)
+			m.RecordActiveDecrement(report.Namespace)
+		})
 		return ctrl.Result{}, nil
 	}
 
@@ -722,4 +768,11 @@ func (r *PodReconciler) applyDiagnosis(
 		report.Status.Phase = v1alpha1.PhaseUnknown
 	}
 	return r.Status().Patch(ctx, report, client.MergeFrom(base))
+}
+
+// recordMetric calls f only when r.Metrics is non-nil, allowing tests to use NoOpRecorder.
+func (r *PodReconciler) recordMetric(f func(metrics.RecorderInterface)) {
+	if r.Metrics != nil {
+		f(r.Metrics)
+	}
 }
