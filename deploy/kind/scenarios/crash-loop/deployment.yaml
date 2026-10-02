@@ -1,0 +1,38 @@
+# CrashLoopBackOff scenario: container prints an error and exits with code 1.
+# Kubernetes retries, triggering CrashLoopBackOff.
+# The investigator diagnoses this as CrashLoopAppError (Medium confidence).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crash-loop-app
+  namespace: demo-crash-loop
+  labels:
+    app: crash-loop-app
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crash-loop-app
+  template:
+    metadata:
+      labels:
+        app: crash-loop-app
+    spec:
+      containers:
+      - name: crasher
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ERROR: fatal startup failure — missing required configuration"
+          echo "Failed to connect to database: connection refused"
+          sleep 2
+          exit 1
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
