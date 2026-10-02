@@ -44,6 +44,7 @@ import (
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/diagnosis"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/evidence"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/investigation"
+	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/reporting"
 )
 
 // PodReconciler watches Pods and Kubernetes Events for failure signals,
@@ -77,6 +78,7 @@ type PodReconciler struct {
 	EvidenceOrchestrator *evidence.EvidenceOrchestrator
 	EvidCorrelator       *correlation.EvidenceCorrelator
 	DiagnosisEngine      *diagnosis.DiagnosisEngine
+	ReportingEngine      *reporting.ReportingEngine
 	Log                  logr.Logger
 }
 
@@ -308,6 +310,20 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, fmt.Errorf("re-fetching report after diagnosis: %w", err)
 		}
 		report = &postDiagReport
+	}
+
+	// ---- Step 9.7: Generate report summary and timeline ----
+	if r.ReportingEngine != nil {
+		renderResult := r.ReportingEngine.Render(report)
+		reportBase := report.DeepCopy()
+		report.Status.Summary = renderResult.Summary
+		report.Status.Timeline = renderResult.Timeline
+		if renderResult.Diagnosis != nil {
+			report.Status.Diagnosis = renderResult.Diagnosis
+		}
+		if patchErr := r.Status().Patch(ctx, report, client.MergeFrom(reportBase)); patchErr != nil {
+			log.Error(patchErr, "failed to patch reporting output, will retry on next reconciliation")
+		}
 	}
 
 	// ---- Step 10: Fetch WorkloadSnapshot for recovery evaluation ----

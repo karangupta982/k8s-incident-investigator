@@ -38,6 +38,10 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - jsonPath: .status.diagnosis.primary.cause
+      name: Cause
+      priority: 1
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -1030,6 +1034,44 @@ spec:
                 description: StartedAt is the time the incident was first detected.
                 format: date-time
                 type: string
+              summary:
+                description: |-
+                  Summary is a concise human-readable summary of the incident.
+                  Updated on every reconciliation cycle.
+                type: string
+              timeline:
+                description: |-
+                  Timeline is a chronologically ordered list of significant events during the incident.
+                  Bounded by MaxTimelineEvents. Updated on every reconciliation cycle.
+                items:
+                  description: TimelineEvent represents a single significant moment
+                    during an incident.
+                  properties:
+                    message:
+                      description: Message is the human-readable description, truncated
+                        to 256 characters.
+                      type: string
+                    reason:
+                      description: Reason is the short machine-readable reason string.
+                      type: string
+                    source:
+                      description: |-
+                        Source identifies where the event came from.
+                        "controller" for lifecycle events (IncidentDetected, WorkloadHealthy, IncidentResolved),
+                        "container" for container termination events,
+                        "kubernetes-event" for events from the Kubernetes Events API.
+                      type: string
+                    timestamp:
+                      description: Timestamp is when this event occurred.
+                      format: date-time
+                      type: string
+                  required:
+                  - message
+                  - reason
+                  - source
+                  - timestamp
+                  type: object
+                type: array
               trigger:
                 description: Trigger is the primary failure signal that created the
                   incident.

@@ -70,6 +70,10 @@ type Config struct {
 	// EvidenceCollectionTimeout is the maximum duration for a single evidence collection cycle.
 	// Default: 30 seconds.
 	EvidenceCollectionTimeout time.Duration
+
+	// MaxTimelineEvents is the maximum number of events stored in the incident timeline.
+	// Default: 50.
+	MaxTimelineEvents int
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -87,6 +91,7 @@ func DefaultConfig() *Config {
 		MaxLogLines:                    200,
 		MaxEventsPerIncident:           25,
 		EvidenceCollectionTimeout:      30 * time.Second,
+		MaxTimelineEvents:              50,
 	}
 }
 
@@ -125,6 +130,9 @@ func (c *Config) Validate() error {
 	}
 	if c.EvidenceCollectionTimeout <= 0 {
 		return fmt.Errorf("evidenceCollectionTimeout must be positive, got %v", c.EvidenceCollectionTimeout)
+	}
+	if c.MaxTimelineEvents <= 0 {
+		return fmt.Errorf("maxTimelineEvents must be positive, got %d", c.MaxTimelineEvents)
 	}
 	return nil
 }
