@@ -28,6 +28,12 @@ type EvidenceSnapshot struct {
 	// +optional
 	CollectedAt *metav1.Time `json:"collectedAt,omitempty"`
 
+	// TriggerType is the classified failure signal that initiated this investigation.
+	// Set by the EvidenceOrchestrator from IncidentReport.Status.Trigger.Type so that
+	// diagnosis rules can inspect it without accessing the IncidentReport directly.
+	// +optional
+	TriggerType string `json:"triggerType,omitempty"`
+
 	// Pod holds evidence from the primary affected Pod.
 	// +optional
 	Pod *PodEvidence `json:"pod,omitempty"`
