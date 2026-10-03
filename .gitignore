@@ -30,3 +30,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Tool and AI workspace directories (local only)
+.kiro/
+.serena/
+bin/
