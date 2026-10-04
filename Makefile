@@ -34,7 +34,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-path $(LOCALBIN)/k8s -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)/k8s -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: test-unit
 test-unit: fmt vet ## Run unit tests only.
@@ -42,7 +42,7 @@ test-unit: fmt vet ## Run unit tests only.
 
 .PHONY: test-integration
 test-integration: fmt vet envtest ## Run integration tests only.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-path $(LOCALBIN)/k8s -p path)" go test ./test/integration/... -v -count=1
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)/k8s -p path)" go test ./test/integration/... -v -count=1
 
 ##@ Build
 

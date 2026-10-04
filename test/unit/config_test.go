@@ -180,8 +180,13 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "zero MaxLogLines is invalid",
+			name:    "zero MaxLogLines is valid (disables log collection)",
 			mutate:  func(c *config.Config) { c.MaxLogLines = 0 },
+			wantErr: false,
+		},
+		{
+			name:    "negative MaxLogLines is invalid",
+			mutate:  func(c *config.Config) { c.MaxLogLines = -1 },
 			wantErr: true,
 		},
 		{

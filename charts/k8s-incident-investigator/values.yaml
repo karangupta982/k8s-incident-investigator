@@ -29,6 +29,8 @@ thresholds:
   schedulingFailure: 5
 
 # Evidence collection limits.
+# Set maxLogLines: 0 to disable container log collection entirely.
+# This prevents any pods/log API call and is useful when logs contain sensitive data.
 evidence:
   maxLogBytes: 32768
   maxLogLines: 200

@@ -60,6 +60,7 @@ type Config struct {
 	MaxLogBytes int
 
 	// MaxLogLines is the maximum number of lines collected per container log excerpt.
+	// Set to 0 to disable container log collection entirely — no pods/log API call will be made.
 	// Default: 200.
 	MaxLogLines int
 
@@ -122,8 +123,8 @@ func (c *Config) Validate() error {
 	if c.MaxLogBytes <= 0 {
 		return fmt.Errorf("maxLogBytes must be positive, got %d", c.MaxLogBytes)
 	}
-	if c.MaxLogLines <= 0 {
-		return fmt.Errorf("maxLogLines must be positive, got %d", c.MaxLogLines)
+	if c.MaxLogLines < 0 {
+		return fmt.Errorf("maxLogLines must be non-negative (0 disables log collection), got %d", c.MaxLogLines)
 	}
 	if c.MaxEventsPerIncident <= 0 {
 		return fmt.Errorf("maxEventsPerIncident must be positive, got %d", c.MaxEventsPerIncident)
