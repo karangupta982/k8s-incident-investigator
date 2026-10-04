@@ -75,6 +75,13 @@ jobs:
         with:
           version: '3.16.0'
 
+      - name: Log in to GHCR for Helm
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
       # Package the chart using --version and --app-version flags.
       # This avoids mutating Chart.yaml or values.yaml during CI and is idempotent on reruns.
       # values.yaml already has `tag: ""` which defaults to Chart.AppVersion in the Deployment template,
@@ -82,6 +89,7 @@ jobs:
       - name: Package Helm chart
         run: |
           helm lint charts/k8s-incident-investigator
+          helm template test-release charts/k8s-incident-investigator > /dev/null
           helm package charts/k8s-incident-investigator \
             --version ${{ steps.version.outputs.HELM_VERSION }} \
             --app-version ${{ steps.version.outputs.VERSION }} \
