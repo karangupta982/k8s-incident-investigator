@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/api/v1alpha1"
 	"github.com/k8s-incident-investigator/k8s-incident-investigator/internal/config"
@@ -40,9 +41,14 @@ func TestLogCollector_MaxLogLines_Zero(t *testing.T) {
 		},
 	}
 
+	// Use a non-nil fake Kubernetes client.
+	// The fake client does not actually support streaming pods/log,
+	// but we verify that no call is made because MaxLogLines=0 short-circuits first.
+	fakeClient := fake.NewSimpleClientset()
+
 	input := CollectorInput{
 		Client:     nil, // no controller-runtime client needed
-		KubeClient: nil, // deliberately nil — if logs.go makes an API call this will panic
+		KubeClient: fakeClient,
 		Pod:        pod,
 		Config:     cfg,
 		Report: &v1alpha1.IncidentReport{
@@ -56,12 +62,16 @@ func TestLogCollector_MaxLogLines_Zero(t *testing.T) {
 	}
 
 	// Call Collect() with needs that would normally trigger log collection.
-	// The MaxLogLines=0 guard should short-circuit before reaching the KubeClient.
+	// The MaxLogLines=0 guard should return nil before any API request.
 	lc := &LogCollector{}
 	result, errs := lc.Collect(context.Background(), input, triggerNeeds{
 		currentLogs:  true,
 		previousLogs: true,
 	})
+	
+	if len(fakeClient.Actions()) != 0 {
+		t.Fatalf("expected no Kubernetes API actions when MaxLogLines=0, got %v", fakeClient.Actions())
+	}
 
 	if result != nil {
 		t.Errorf("expected nil log result when MaxLogLines=0, got %d entries", len(result))

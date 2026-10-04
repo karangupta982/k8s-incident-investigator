@@ -27,30 +27,42 @@ No dashboards. No agents. No external services. It installs into your cluster as
 
 ## Install
 
-> **Helm chart coming in v0.1.0.** Until then, use the Kustomize manifests below.
-
 ```bash
-# Install CRDs
-kubectl apply -f https://raw.githubusercontent.com/karangupta982/k8s-incident-investigator/main/config/crd/bases/investigation.k8s.io_incidentreports.yaml
-
-# Install controller
-kubectl apply -k https://github.com/karangupta982/k8s-incident-investigator/config/default
+helm install incident-investigator \
+  oci://ghcr.io/karangupta982/charts/k8s-incident-investigator \
+  --version 0.1.0 \
+  --namespace incident-investigator-system \
+  --create-namespace
 ```
 
-Or clone and install locally:
+Verify:
 
 ```bash
-git clone https://github.com/karangupta982/k8s-incident-investigator
-cd k8s-incident-investigator
-kubectl apply -k config/default
+kubectl get pods -n incident-investigator-system
+kubectl get incidentreports -A
 ```
 
 **Uninstall:**
 
 ```bash
-kubectl delete -k config/default
-kubectl delete -f config/crd/bases/investigation.k8s.io_incidentreports.yaml
+helm uninstall incident-investigator -n incident-investigator-system
 ```
+
+Note: Helm intentionally retains the `IncidentReport` CRD and all stored incident reports during uninstall. To completely remove the CRD and all associated data:
+
+```bash
+kubectl delete crd incidentreports.investigation.k8s.io
+```
+
+**Warning:** Deleting the CRD will permanently delete all stored `IncidentReport` resources across all namespaces.
+
+If the `incident-investigator-system` namespace was created exclusively for this controller and contains no other resources, you can delete it:
+
+```bash
+kubectl delete namespace incident-investigator-system
+```
+
+For alternative installation methods (Kustomize, local development), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -204,7 +216,7 @@ All flags are optional with sensible defaults.
 - Kubernetes 1.28+
 - `kubectl`
 
-The controller requires read-only access to: Pods, Events, Nodes, ReplicaSets, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, PersistentVolumeClaims, PersistentVolumes, StorageClasses, and `pods/log`. It requires read-write access to `IncidentReport` custom resources only. It never modifies any workload resource.
+The controller requires read-only access to: Pods, Events, Nodes, ReplicaSets, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, PersistentVolumeClaims, PersistentVolumes, StorageClasses, and `pods/log`. It requires read-write access to `IncidentReport` custom resources, namespace-scoped `Leases` (for leader election), and Kubernetes `Events` (create/patch). It never modifies any workload resource.
 
 ---
 

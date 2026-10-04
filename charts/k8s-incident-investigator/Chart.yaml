@@ -21,6 +21,3 @@ maintainers:
 home: https://github.com/karangupta982/k8s-incident-investigator
 annotations:
   artifacthub.io/license: Apache-2.0
-  artifacthub.io/signKey: |
-    fingerprint: ""
-    url: ""
