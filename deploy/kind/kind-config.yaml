@@ -1,0 +1,13 @@
+# Kind cluster configuration for local development and e2e testing.
+# Single-node cluster — sufficient for demonstrating the Incident Investigator.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: incident-investigator
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"

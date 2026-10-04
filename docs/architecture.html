@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Incident Investigator — Architecture</title>
+<style>
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;--cyan:#39c5cf;--yellow:#e3b341}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+  header{padding:28px 36px 18px;border-bottom:1px solid var(--border)}
+  header h1{font-size:1.5rem;font-weight:700;color:var(--blue)}
+  header p{color:var(--muted);margin-top:6px;font-size:.88rem}
+  .layout{display:flex;min-height:calc(100vh - 82px)}
+  .left{width:260px;min-width:260px;padding:20px 16px;border-right:1px solid var(--border)}
+  .left h3,.right h3{font-size:.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px}
+  .step{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:7px;margin-bottom:3px;cursor:default}
+  .step:hover{background:var(--surface)}
+  .num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700;flex-shrink:0;margin-top:1px}
+  .st{flex:1}
+  .st-t{font-size:.8rem;font-weight:600;line-height:1.3}
+  .st-s{font-size:.7rem;color:var(--muted);margin-top:1px}
+  .conn{width:1px;height:10px;background:var(--border);margin-left:21px}
+  .n1 .num{background:rgba(88,166,255,.15);color:var(--blue)}
+  .n2 .num{background:rgba(63,185,80,.15);color:var(--green)}
+  .n3 .num{background:rgba(210,153,34,.15);color:var(--orange)}
+  .n4 .num{background:rgba(57,197,207,.15);color:var(--cyan)}
+  .n5 .num{background:rgba(188,140,255,.15);color:var(--purple)}
+  .n6 .num{background:rgba(227,179,65,.15);color:var(--yellow)}
+  .n7 .num{background:rgba(248,81,73,.15);color:var(--red)}
+  .n8 .num{background:rgba(63,185,80,.15);color:var(--green)}
+  .mid{flex:1;padding:20px;overflow-y:auto}
+  .stitle{font-size:.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px}
+  .tpills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+  .tp{padding:4px 11px;border-radius:18px;font-size:.7rem;font-weight:600;border:1px solid}
+  .ts{border-color:var(--red);color:var(--red);background:rgba(248,81,73,.08)}
+  .te{border-color:var(--orange);color:var(--orange);background:rgba(210,153,34,.08)}
+  .arr{text-align:center;color:var(--border);font-size:1.1rem;margin:3px 0}
+  .box{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin-bottom:6px}
+  .bt{font-size:.8rem;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:7px}
+  .bd{font-size:.73rem;color:var(--muted);line-height:1.5}
+  .box.bl{border-color:rgba(88,166,255,.3)}
+  .box.bg{border-color:rgba(63,185,80,.3)}
+  .box.bo{border-color:rgba(210,153,34,.3)}
+  .box.bc{border-color:rgba(57,197,207,.3)}
+  .box.bp{border-color:rgba(188,140,255,.3)}
+  .box.by{border-color:rgba(227,179,65,.3)}
+  .cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+  .cc{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 10px}
+  .cct{font-size:.73rem;font-weight:600;margin-bottom:2px;color:var(--orange)}
+  .ccd{font-size:.67rem;color:var(--muted);line-height:1.6}
+  .rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:7px}
+  .rule{background:var(--surface2);border-radius:5px;padding:7px 9px;font-size:.71rem;display:flex;align-items:center;gap:7px}
+  .ch{color:var(--green)}.cm{color:var(--yellow)}
+  .irg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+  .irf{background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:.71rem}
+  .irfn{font-weight:600;color:var(--blue);margin-bottom:2px}
+  .irfd{color:var(--muted);font-size:.67rem}
+  .right{width:300px;min-width:300px;padding:20px 16px;border-left:1px solid var(--border);overflow-y:auto}
+  .kb{background:#000;border:1px solid var(--border);border-radius:7px;padding:12px;font-family:'SF Mono','Fira Code',monospace;font-size:.7rem;line-height:1.75;margin-bottom:14px;white-space:pre-wrap;word-break:break-all}
+  .kw{color:var(--blue)}.kv{color:var(--green)}.km{color:var(--muted)}.kh{color:var(--orange)}.kr{color:var(--red)}
+  .fl{list-style:none}
+  .fl li{font-size:.76rem;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border);line-height:1.4}
+  .fl li:last-child{border:none}
+  .fl strong{color:var(--text)}
+  @media(max-width:1100px){.right{display:none}}
+  @media(max-width:760px){.left{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Kubernetes Incident Investigator</h1>
+  <p>Automated workload failure detection, evidence collection, diagnosis, and reporting — entirely Kubernetes-native, no external dependencies.</p>
+</header>
+<div class="layout">
+
+<nav class="left">
+  <h3>Investigation Pipeline</h3>
+  <div class="step n1"><div class="num">1</div><div class="st"><div class="st-t">Failure Detection</div><div class="st-s">Pod state + Event counts</div></div></div>
+  <div class="conn"></div>
+  <div class="step n2"><div class="num">2</div><div class="st"><div class="st-t">Incident Correlation</div><div class="st-s">One report per workload</div></div></div>
+  <div class="conn"></div>
+  <div class="step n3"><div class="num">3</div><div class="st"><div class="st-t">Evidence Collection</div><div class="st-s">Pod, Events, Logs, Node, PVCs</div></div></div>
+  <div class="conn"></div>
+  <div class="step n4"><div class="num">4</div><div class="st"><div class="st-t">Evidence Correlation</div><div class="st-s">Causal signals + log patterns</div></div></div>
+  <div class="conn"></div>
+  <div class="step n5"><div class="num">5</div><div class="st"><div class="st-t">Diagnosis Engine</div><div class="st-s">10 deterministic rules</div></div></div>
+  <div class="conn"></div>
+  <div class="step n6"><div class="num">6</div><div class="st"><div class="st-t">Reporting</div><div class="st-s">Summary + Timeline</div></div></div>
+  <div class="conn"></div>
+  <div class="step n7"><div class="num">7</div><div class="st"><div class="st-t">Recovery Detection</div><div class="st-s">Stability period</div></div></div>
+  <div class="conn"></div>
+  <div class="step n8"><div class="num">8</div><div class="st"><div class="st-t">Historical Record</div><div class="st-s">Permanent, never overwritten</div></div></div>
+</nav>
+
+<main class="mid">
+  <div class="stitle">Trigger Sources</div>
+  <div class="tpills">
+    <div class="tp ts">OOMKilled</div><div class="tp ts">CrashLoopBackOff</div>
+    <div class="tp ts">ImagePullBackOff</div><div class="tp ts">CreateContainerConfigError</div><div class="tp ts">Eviction</div>
+    <div class="tp te">ReadinessProbeFailure ×N</div><div class="tp te">LivenessProbeFailure ×N</div>
+    <div class="tp te">MountFailure ×N</div><div class="tp te">SchedulingFailure ×N</div>
+  </div>
+  <div style="font-size:.67rem;color:var(--muted);margin-bottom:10px">🔴 State-based: immediate &nbsp;&nbsp; 🟠 Event-based: Event.count ≥ threshold</div>
+
+  <div class="arr">↓</div>
+  <div class="box bl">
+    <div class="bt"><span style="color:var(--blue)">⚙</span> PodReconciler <span style="font-size:.68rem;font-weight:400;color:var(--muted)">controller-runtime watch loop</span></div>
+    <div class="bd">Watches Pods and Kubernetes Events. Runs the full pipeline on each reconcile. Requeues every 30s for active incidents. Idempotent — safe to run multiple times on the same state.</div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box bg">
+    <div class="bt"><span style="color:var(--green)">🔍</span> Incident Correlation</div>
+    <div class="bd">Deterministic GET by active name <code style="color:var(--green)">&lt;workload&gt;-&lt;kind&gt;-active</code>. AlreadyExists race handled. One active incident per workload. Resolved incidents are preserved as historical records with a unique hash suffix.</div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box bo">
+    <div class="bt"><span style="color:var(--orange)">📦</span> Evidence Collection <span style="font-size:.68rem;font-weight:400;color:var(--muted)">6 collectors, bounded, best-effort</span></div>
+    <div class="bd">Trigger type determines which layers are collected. Failures in one layer don't block others. Collection has a 30s timeout.</div>
+    <div class="cgrid">
+      <div class="cc"><div class="cct">Pod</div><div class="ccd">Container states<br>Exit codes<br>Resource limits<br>Probe config</div></div>
+      <div class="cc"><div class="cct">Events</div><div class="ccd">Kubernetes Events<br>Sorted by LastTime<br>Max 25, msg ≤ 256</div></div>
+      <div class="cc"><div class="cct">Logs</div><div class="ccd">Current + previous<br>Max 32KB/200 lines<br>Crash/OOM triggers only</div></div>
+      <div class="cc"><div class="cct">Node</div><div class="ccd">MemoryPressure<br>DiskPressure<br>Allocatable resources</div></div>
+      <div class="cc"><div class="cct">Workload</div><div class="ccd">Replica counts<br>Conditions (max 10)<br>Update strategy</div></div>
+      <div class="cc"><div class="cct">Dependencies</div><div class="ccd">PVC/PV (MountFailure)<br>Pull secret names<br>Scheduling constraints</div></div>
+    </div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box bc">
+    <div class="bt"><span style="color:var(--cyan)">🔗</span> Evidence Correlation</div>
+    <div class="bd">Pure function over EvidenceSnapshot. Derives <strong>CausalSignals</strong> (OOMKillCausedCrashLoop, PVCIsUnbound, NodeMemoryPressureCoincident…), <strong>LogPatterns</strong> (OOMString, ConnectionRefused, PanicOrFatal…), and <strong>ChainPatterns</strong>. No API calls.</div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box bp">
+    <div class="bt"><span style="color:var(--purple)">🧠</span> Diagnosis Engine <span style="font-size:.68rem;font-weight:400;color:var(--muted)">deterministic, no LLM</span></div>
+    <div class="bd">10 independently testable rules. Highest-confidence match is Primary. Others become ContributingFactors or AlternativeHypotheses. Unknown is a valid, honest outcome.</div>
+    <div class="rgrid">
+      <div class="rule"><span class="ch">●</span> OOMMemoryLimit</div>
+      <div class="rule"><span class="cm">●</span> NodeMemoryPressure</div>
+      <div class="rule"><span class="ch">●</span> CrashLoopOOMExit</div>
+      <div class="rule"><span class="cm">●</span> CrashLoopAppError</div>
+      <div class="rule"><span class="ch">●</span> ImagePullFailure</div>
+      <div class="rule"><span class="ch">●</span> MissingConfigReference</div>
+      <div class="rule"><span class="ch">●</span> PVCNotBound</div>
+      <div class="rule"><span class="cm">●</span> PVCMountError</div>
+      <div class="rule"><span class="ch">●</span> SchedulingFailure</div>
+      <div class="rule"><span class="cm">●</span> ProbeFailure</div>
+    </div>
+    <div style="margin-top:7px;font-size:.67rem;color:var(--muted)"><span class="ch">● High</span> &nbsp; <span class="cm">● Medium</span></div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box by">
+    <div class="bt"><span style="color:var(--yellow)">📋</span> IncidentReport CRD — the persistent investigation record</div>
+    <div class="irg">
+      <div class="irf"><div class="irfn">phase</div><div class="irfd">Investigating → Diagnosed/Unknown → Resolved</div></div>
+      <div class="irf"><div class="irfn">summary</div><div class="irfd">Human-readable one-screen summary</div></div>
+      <div class="irf"><div class="irfn">diagnosis</div><div class="irfd">Primary finding + evidence + recommendation</div></div>
+      <div class="irf"><div class="irfn">timeline</div><div class="irfd">Chronological events, max 50</div></div>
+      <div class="irf"><div class="irfn">evidence</div><div class="irfd">Pod, Events, Logs, Node, Workload, Dependencies</div></div>
+      <div class="irf"><div class="irfn">affectedPods</div><div class="irfd">Preserved even after Pod deletion</div></div>
+    </div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div class="box bg">
+    <div class="bt"><span style="color:var(--green)">♻</span> Recovery Detection</div>
+    <div class="bd">Workload-type-aware health: Deployment (readyReplicas ≥ spec.replicas), StatefulSet, DaemonSet (numberReady), Job (succeeded ≥ 1). Stability period (default 5 min) before resolving.</div>
+  </div>
+
+  <div class="arr">↓</div>
+  <div style="display:flex;gap:8px">
+    <div class="box bl" style="flex:1;margin:0"><div class="bt" style="font-size:.75rem"><span style="color:var(--blue)">📂</span> Active Slot</div><div class="bd" style="font-size:.7rem"><code>&lt;workload&gt;-&lt;kind&gt;-active</code><br>One per workload. Freed on resolution.</div></div>
+    <div style="display:flex;align-items:center;color:var(--muted);padding:0 4px">→</div>
+    <div class="box bg" style="flex:1;margin:0"><div class="bt" style="font-size:.75rem"><span style="color:var(--green)">🗂</span> Historical Record</div><div class="bd" style="font-size:.7rem"><code>&lt;workload&gt;-&lt;kind&gt;-&lt;date&gt;-&lt;hash&gt;</code><br>Permanent. Multiple per workload.</div></div>
+  </div>
+</main>
+
+<aside class="right">
+  <h3>What engineers see</h3>
+  <div class="kb"><span class="km">$ kubectl get incidentreports -A</span>
+
+<span class="kw">NAME</span>                           <span class="kw">WORKLOAD</span>     <span class="kw">PHASE</span>
+<span class="kv">payment-api-deployment-active</span>  <span class="kv">payment-api</span>  <span class="kh">Diagnosed</span>
+<span class="kv">worker-deploy-20260829-a3f2b</span>   <span class="kv">worker</span>       <span class="km">Resolved</span></div>
+
+  <div class="kb"><span class="km">$ kubectl describe incidentreport \
+  payment-api-deployment-active</span>
+
+<span class="kw">Phase:</span>   <span class="kh">Diagnosed</span>
+<span class="kw">Summary:</span>
+  <span class="kv">Workload: Deployment/payment-api</span>
+  <span class="kv">Phase: Diagnosed (High confidence)</span>
+  <span class="kv">Cause: Container exceeded memory limit</span>
+
+<span class="kw">Diagnosis:</span>
+  <span class="kw">Rule:</span>        <span class="kv">OOMMemoryLimit</span>
+  <span class="kw">Confidence:</span> <span class="kh">High</span>
+  <span class="kw">Evidence:</span>
+    <span class="kv">- OOMKilled, exit 137</span>
+    <span class="kv">- memory limit: 512Mi</span>
+    <span class="kv">- no node MemoryPressure</span>
+  <span class="kw">Rec:</span>
+    <span class="kv">Investigate memory usage.</span>
+    <span class="kv">Consider raising limit.</span>
+
+<span class="kw">Timeline:</span>
+  <span class="km">14:02:00</span> <span class="kv">IncidentDetected</span>
+  <span class="km">14:02:08</span> <span class="kv">OOMKilled (container)</span>
+  <span class="km">14:02:09</span> <span class="kv">Unhealthy event</span>
+
+<span class="kw">Affected Pods:</span>
+  <span class="kv">payment-api-abc123</span></div>
+
+  <h3>Design principles</h3>
+  <ul class="fl">
+    <li><strong>Read-only</strong> — no workload modifications</li>
+    <li><strong>Deterministic naming</strong> — no duplicate incidents</li>
+    <li><strong>Restart-safe</strong> — all state in CRD status (etcd)</li>
+    <li><strong>Bounded</strong> — logs, events, API calls have limits</li>
+    <li><strong>No LLM required</strong> — fully deterministic diagnosis</li>
+    <li><strong>Honest uncertainty</strong> — Unknown is a valid outcome</li>
+    <li><strong>Workload-aware recovery</strong> — replica counts, not raw Pods</li>
+    <li><strong>10 Prometheus metrics</strong> — operational observability</li>
+  </ul>
+
+  <h3 style="margin-top:16px">Install (coming v0.1.0)</h3>
+  <div class="kb"><span class="kw">helm install</span> incident-investigator \
+  oci://ghcr.io/karangupta982/\
+charts/k8s-incident-investigator \
+  <span class="km">--version 0.1.0</span> \
+  -n investigator-system \
+  --create-namespace</div>
+</aside>
+
+</div>
+</body>
+</html>

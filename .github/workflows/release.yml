@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run tests
+        run: |
+          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
+          KUBEBUILDER_ASSETS=$($(go env GOPATH)/bin/setup-envtest use 1.32.0 -p path) \
+            go test ./... -v -count=1 -timeout=180s
+
+      - name: Set up QEMU (for multi-arch builds)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract both forms of the version:
+      #   VERSION     = v0.1.0  (used for Docker image tags)
+      #   HELM_VERSION = 0.1.0  (used for Helm chart version — no leading v)
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          HELM_VERSION=${VERSION#v}
+          echo "VERSION=${VERSION}"       >> $GITHUB_OUTPUT
+          echo "HELM_VERSION=${HELM_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/k8s-incident-investigator:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/k8s-incident-investigator:latest
+          labels: |
+            org.opencontainers.image.title=k8s-incident-investigator
+            org.opencontainers.image.description=Kubernetes-native automated workload failure investigation controller
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.16.0'
+
+      # Package the chart using --version and --app-version flags.
+      # This avoids mutating Chart.yaml or values.yaml during CI and is idempotent on reruns.
+      # values.yaml already has `tag: ""` which defaults to Chart.AppVersion in the Deployment template,
+      # so no sed on values.yaml is needed.
+      - name: Package Helm chart
+        run: |
+          helm lint charts/k8s-incident-investigator
+          helm package charts/k8s-incident-investigator \
+            --version ${{ steps.version.outputs.HELM_VERSION }} \
+            --app-version ${{ steps.version.outputs.VERSION }} \
+            --destination .
+
+      - name: Push Helm chart to GHCR
+        run: |
+          helm push k8s-incident-investigator-${{ steps.version.outputs.HELM_VERSION }}.tgz \
+            oci://ghcr.io/${{ github.repository_owner }}/charts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: k8s-incident-investigator-${{ steps.version.outputs.HELM_VERSION }}.tgz
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Helm (recommended)
+
+            ```bash
+            helm install incident-investigator \
+              oci://ghcr.io/${{ github.repository_owner }}/charts/k8s-incident-investigator \
+              --version ${{ steps.version.outputs.HELM_VERSION }} \
+              --namespace incident-investigator-system \
+              --create-namespace
+            ```
+
+            Verify:
+            ```bash
+            kubectl get pods -n incident-investigator-system
+            kubectl get incidentreports -A
+            ```
+
+            ### Container image
+
+            ```
+            ghcr.io/${{ github.repository_owner }}/k8s-incident-investigator:${{ steps.version.outputs.VERSION }}
+            ```
+
+            Supported platforms: `linux/amd64`, `linux/arm64`
+
+            ## What's in this release
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for full details.

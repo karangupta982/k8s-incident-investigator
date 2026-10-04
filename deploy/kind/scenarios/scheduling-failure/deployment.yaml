@@ -1,0 +1,32 @@
+# SchedulingFailure scenario: requests 999 CPUs — no node can satisfy this.
+# The scheduler emits FailedScheduling events repeatedly.
+# The investigator diagnoses this as SchedulingFailure (High confidence).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unschedulable-app
+  namespace: demo-scheduling
+  labels:
+    app: unschedulable-app
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unschedulable-app
+  template:
+    metadata:
+      labels:
+        app: unschedulable-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:alpine
+        resources:
+          requests:
+            # Requesting 999 CPUs ensures no node in a Kind cluster can satisfy this
+            cpu: "999"
+            memory: "64Mi"
+          limits:
+            cpu: "999"
+            memory: "64Mi"

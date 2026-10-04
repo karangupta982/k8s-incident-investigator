@@ -1,0 +1,42 @@
+# ReadinessProbeFailure scenario: nginx serves on port 80 but the probe
+# checks port 8080 (nothing listening there). The probe always fails.
+# Kubernetes emits Unhealthy events once the threshold is crossed.
+# The investigator diagnoses this as ProbeFailure (Medium confidence).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-fail-app
+  namespace: demo-probe-failure
+  labels:
+    app: probe-fail-app
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: probe-fail-app
+  template:
+    metadata:
+      labels:
+        app: probe-fail-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            # nginx listens on 80 — this probe intentionally checks a wrong port
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          failureThreshold: 3
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "16Mi"
+            cpu: "10m"

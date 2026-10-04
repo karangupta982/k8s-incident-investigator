@@ -1,0 +1,1112 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.kubernetes.io: unapproved, awaiting upstream approval; see https://github.com/kubernetes/enhancements/pull/1111
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: incidentreports.investigation.k8s.io
+spec:
+  group: investigation.k8s.io
+  names:
+    categories:
+    - investigator
+    kind: IncidentReport
+    listKind: IncidentReportList
+    plural: incidentreports
+    shortNames:
+    - ir
+    singular: incidentreport
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.workload.name
+      name: Workload
+      type: string
+    - jsonPath: .spec.workload.kind
+      name: Kind
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.trigger.type
+      name: Trigger
+      type: string
+    - jsonPath: .status.startedAt
+      name: Started
+      type: date
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .status.diagnosis.primary.cause
+      name: Cause
+      priority: 1
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: IncidentReport is the Schema for the incidentreports API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              IncidentReportSpec contains the immutable identity of the incident.
+              Fields in spec are set at creation and not modified during the lifecycle.
+
+              Note: The incident namespace is derived from metadata.namespace (standard Kubernetes
+              convention for namespace-scoped resources). There is no spec.namespace field — storing
+              the namespace in spec would create a second, potentially conflicting source of truth.
+            properties:
+              workload:
+                description: |-
+                  Workload is the workload associated with the incident.
+                  Set when ownership can be resolved; may be empty if resolution failed.
+                properties:
+                  kind:
+                    description: 'Kind is the workload type: Deployment, StatefulSet,
+                      DaemonSet, Job, CronJob.'
+                    type: string
+                  name:
+                    description: Name is the workload name.
+                    type: string
+                  namespace:
+                    description: Namespace is the workload namespace.
+                    type: string
+                  uid:
+                    description: UID is the workload UID, used to detect workload
+                      replacement.
+                    type: string
+                required:
+                - kind
+                - name
+                - namespace
+                type: object
+            type: object
+          status:
+            description: |-
+              IncidentReportStatus holds the dynamic investigation state of the incident.
+              Updated throughout the incident lifecycle via the status subresource.
+            properties:
+              affectedPods:
+                description: |-
+                  AffectedPods is the list of Pods associated with this incident.
+                  Pods are appended; existing entries are preserved even after Pod deletion.
+                items:
+                  description: PodRef identifies a Pod affected by an incident.
+                  properties:
+                    name:
+                      description: Name is the Pod name.
+                      type: string
+                    namespace:
+                      description: Namespace is the Pod namespace.
+                      type: string
+                    uid:
+                      description: UID is the Pod UID, used to distinguish replaced
+                        Pods with the same name.
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  type: object
+                type: array
+              conditions:
+                description: Conditions provides standard Kubernetes condition semantics
+                  for the incident state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              correlatedEvidence:
+                description: |-
+                  CorrelatedEvidence holds derived signals computed from the EvidenceSnapshot.
+                  Updated after each evidence collection cycle.
+                properties:
+                  causalSignals:
+                    description: CausalSignals holds derived boolean and string signals
+                      from multi-source evidence.
+                    properties:
+                      containerHitConfiguredLimit:
+                        description: |-
+                          ContainerHitConfiguredLimit is true when OOMKilled occurred
+                          and the container had a configured memory limit.
+                        type: boolean
+                      mountFailureLinkedToPVC:
+                        description: |-
+                          MountFailureLinkedToPVC is true when FailedMount events exist
+                          and PVC evidence is present.
+                        type: boolean
+                      nodeMemoryPressureCoincident:
+                        description: |-
+                          NodeMemoryPressureCoincident is true when OOMKilled occurred
+                          while the node was reporting MemoryPressure=True.
+                        type: boolean
+                      oomKillCausedCrashLoop:
+                        description: |-
+                          OOMKillCausedCrashLoop is true when OOMKilled exit codes are detected
+                          alongside CrashLoopBackOff waiting state for the same container.
+                        type: boolean
+                      pvcIsUnbound:
+                        description: PVCIsUnbound is true when at least one referenced
+                          PVC is not in Bound phase.
+                        type: boolean
+                      schedulingConstraintsPresent:
+                        description: |-
+                          SchedulingConstraintsPresent is true when FailedScheduling events exist
+                          and scheduling constraints are present in the evidence.
+                        type: boolean
+                      unboundPVCNames:
+                        description: UnboundPVCNames lists the names of PVCs that
+                          are not Bound.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  chainPatterns:
+                    description: ChainPatterns lists identified causal event chain
+                      types.
+                    items:
+                      type: string
+                    type: array
+                  correlatedAt:
+                    description: CorrelatedAt is the timestamp when correlation last
+                      ran.
+                    format: date-time
+                    type: string
+                  logPatterns:
+                    description: LogPatterns holds patterns detected in container
+                      log lines.
+                    properties:
+                      containerWithPattern:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ContainerWithPattern maps pattern name to the first container name
+                          where the pattern was detected.
+                        type: object
+                      containsConnectionRefused:
+                        description: ContainsConnectionRefused is true when any log
+                          line contains a connection refused error.
+                        type: boolean
+                      containsOOMString:
+                        description: ContainsOOMString is true when any log line contains
+                          an OOM-related string.
+                        type: boolean
+                      containsPanicOrFatal:
+                        description: ContainsPanicOrFatal is true when any log line
+                          contains a panic or fatal error.
+                        type: boolean
+                      containsPermissionDenied:
+                        description: ContainsPermissionDenied is true when any log
+                          line contains a permission error.
+                        type: boolean
+                    type: object
+                type: object
+              diagnosis:
+                description: |-
+                  Diagnosis holds the result of the diagnosis engine evaluation.
+                  Set after evidence collection; replaced on each reconciliation cycle.
+                properties:
+                  alternativeHypotheses:
+                    description: |-
+                      AlternativeHypotheses lists rules that matched at the same confidence level as the
+                      primary finding, representing plausible alternative explanations.
+                    items:
+                      description: DiagnosisFinding represents a single rule match
+                        with its evidence-backed explanation.
+                      properties:
+                        cause:
+                          description: Cause is a concise human-readable description
+                            of the identified root cause.
+                          type: string
+                        confidence:
+                          description: Confidence is the qualitative strength of this
+                            finding.
+                          enum:
+                          - High
+                          - Medium
+                          - Low
+                          type: string
+                        explanation:
+                          description: Explanation provides a longer evidence-backed
+                            description of why this finding was reached.
+                          type: string
+                        recommendation:
+                          description: |-
+                            Recommendation is a short, actionable suggestion tied directly to this finding.
+                            Must be specific and evidence-backed; must not recommend automatic remediation.
+                          type: string
+                        ruleID:
+                          description: RuleID is the identifier of the rule that produced
+                            this finding (e.g., "OOMMemoryLimit").
+                          type: string
+                        supportingEvidence:
+                          description: |-
+                            SupportingEvidence lists the specific evidence items that led to this finding.
+                            Each entry is a short human-readable string.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - cause
+                      - confidence
+                      - explanation
+                      - ruleID
+                      type: object
+                    type: array
+                  contributingFactors:
+                    description: |-
+                      ContributingFactors lists other rules that fired alongside the primary finding
+                      at a lower confidence level.
+                    items:
+                      description: DiagnosisFinding represents a single rule match
+                        with its evidence-backed explanation.
+                      properties:
+                        cause:
+                          description: Cause is a concise human-readable description
+                            of the identified root cause.
+                          type: string
+                        confidence:
+                          description: Confidence is the qualitative strength of this
+                            finding.
+                          enum:
+                          - High
+                          - Medium
+                          - Low
+                          type: string
+                        explanation:
+                          description: Explanation provides a longer evidence-backed
+                            description of why this finding was reached.
+                          type: string
+                        recommendation:
+                          description: |-
+                            Recommendation is a short, actionable suggestion tied directly to this finding.
+                            Must be specific and evidence-backed; must not recommend automatic remediation.
+                          type: string
+                        ruleID:
+                          description: RuleID is the identifier of the rule that produced
+                            this finding (e.g., "OOMMemoryLimit").
+                          type: string
+                        supportingEvidence:
+                          description: |-
+                            SupportingEvidence lists the specific evidence items that led to this finding.
+                            Each entry is a short human-readable string.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - cause
+                      - confidence
+                      - explanation
+                      - ruleID
+                      type: object
+                    type: array
+                  evaluatedAt:
+                    description: EvaluatedAt is the timestamp when diagnosis was last
+                      run.
+                    format: date-time
+                    type: string
+                  primary:
+                    description: |-
+                      Primary is the highest-confidence matching diagnosis finding.
+                      Nil when no rule matched (phase will be Unknown).
+                    properties:
+                      cause:
+                        description: Cause is a concise human-readable description
+                          of the identified root cause.
+                        type: string
+                      confidence:
+                        description: Confidence is the qualitative strength of this
+                          finding.
+                        enum:
+                        - High
+                        - Medium
+                        - Low
+                        type: string
+                      explanation:
+                        description: Explanation provides a longer evidence-backed
+                          description of why this finding was reached.
+                        type: string
+                      recommendation:
+                        description: |-
+                          Recommendation is a short, actionable suggestion tied directly to this finding.
+                          Must be specific and evidence-backed; must not recommend automatic remediation.
+                        type: string
+                      ruleID:
+                        description: RuleID is the identifier of the rule that produced
+                          this finding (e.g., "OOMMemoryLimit").
+                        type: string
+                      supportingEvidence:
+                        description: |-
+                          SupportingEvidence lists the specific evidence items that led to this finding.
+                          Each entry is a short human-readable string.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - cause
+                    - confidence
+                    - explanation
+                    - ruleID
+                    type: object
+                  rulesEvaluated:
+                    description: RulesEvaluated is the count of rules that were evaluated.
+                    type: integer
+                  unknownReason:
+                    description: UnknownReason explains why no diagnosis was made
+                      when Primary is nil.
+                    type: string
+                required:
+                - rulesEvaluated
+                type: object
+              evidence:
+                description: |-
+                  Evidence holds the collected investigation evidence.
+                  Populated after initial trigger detection; refreshed on subsequent reconciliations.
+                properties:
+                  collectedAt:
+                    description: CollectedAt is the time evidence collection last
+                      completed (or was interrupted).
+                    format: date-time
+                    type: string
+                  collectionErrors:
+                    description: CollectionErrors records sources that could not be
+                      collected and why.
+                    items:
+                      description: CollectionError records a source that could not
+                        be collected and why.
+                      properties:
+                        reason:
+                          description: Reason is a human-readable description of the
+                            failure.
+                          type: string
+                        source:
+                          description: |-
+                            Source identifies which evidence source failed
+                            (e.g., "pod", "events", "node", "workload", "logs/my-container", "pvc/my-pvc").
+                          type: string
+                      required:
+                      - reason
+                      - source
+                      type: object
+                    type: array
+                  dependencies:
+                    description: Dependencies holds evidence about workload dependencies
+                      relevant to the trigger type.
+                    properties:
+                      imagePullSecretNames:
+                        description: |-
+                          ImagePullSecretNames holds the names of ImagePullSecrets referenced by the Pod.
+                          Values (secret data) are never stored.
+                          Populated for ImagePullBackOff triggers.
+                        items:
+                          type: string
+                        type: array
+                      pvcs:
+                        description: |-
+                          PVCs holds evidence for PersistentVolumeClaims referenced by the affected Pod.
+                          Populated for MountFailure triggers.
+                        items:
+                          description: PVCEvidence holds evidence about a PersistentVolumeClaim.
+                          properties:
+                            accessModes:
+                              description: AccessModes is the list of access modes
+                                requested by the PVC.
+                              items:
+                                type: string
+                              type: array
+                            boundPVName:
+                              description: BoundPVName is the name of the PersistentVolume
+                                the PVC is bound to.
+                              type: string
+                            name:
+                              description: Name is the PVC name.
+                              type: string
+                            namespace:
+                              description: Namespace is the PVC namespace.
+                              type: string
+                            phase:
+                              description: 'Phase is the PVC phase: Pending, Bound,
+                                Lost.'
+                              type: string
+                            pvReclaimPolicy:
+                              description: PVReclaimPolicy is the reclaim policy of
+                                the bound PersistentVolume.
+                              type: string
+                            requestedStorage:
+                              description: RequestedStorage is the storage capacity
+                                requested by the PVC.
+                              type: string
+                            storageClassName:
+                              description: StorageClassName is the storage class used
+                                by the PVC.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          - phase
+                          type: object
+                        type: array
+                      schedulingConstraints:
+                        description: |-
+                          SchedulingConstraints holds scheduling-relevant Pod spec fields.
+                          Populated for SchedulingFailure triggers.
+                        properties:
+                          nodeSelector:
+                            additionalProperties:
+                              type: string
+                            description: NodeSelector holds the Pod's nodeSelector
+                              labels.
+                            type: object
+                          resourceRequests:
+                            additionalProperties:
+                              type: string
+                            description: ResourceRequests holds aggregated resource
+                              requests across all containers.
+                            type: object
+                          tolerations:
+                            description: Tolerations holds the Pod's tolerations as
+                              strings (key=value:effect).
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                    type: object
+                  events:
+                    description: Events is a bounded list of relevant Kubernetes Events.
+                    items:
+                      description: EventEvidence holds evidence from a single Kubernetes
+                        Event.
+                      properties:
+                        count:
+                          description: Count is the number of times this event has
+                            occurred.
+                          format: int32
+                          type: integer
+                        firstTime:
+                          description: FirstTime is when the event was first observed.
+                          format: date-time
+                          type: string
+                        involvedObjectKind:
+                          description: InvolvedObjectKind is the kind of the object
+                            this event refers to.
+                          type: string
+                        involvedObjectName:
+                          description: InvolvedObjectName is the name of the object
+                            this event refers to.
+                          type: string
+                        lastTime:
+                          description: LastTime is when the event was most recently
+                            observed.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is the human-readable event message,
+                            truncated to 256 characters.
+                          type: string
+                        reason:
+                          description: Reason is the short machine-readable reason
+                            string (e.g., OOMKilled, FailedMount).
+                          type: string
+                      required:
+                      - count
+                      - involvedObjectKind
+                      - involvedObjectName
+                      - message
+                      - reason
+                      type: object
+                    type: array
+                  logs:
+                    description: Logs holds bounded container log excerpts.
+                    items:
+                      description: ContainerLogEvidence holds a bounded excerpt of
+                        a container's logs.
+                      properties:
+                        containerName:
+                          description: ContainerName is the container whose logs were
+                            collected.
+                          type: string
+                        isPrevious:
+                          description: IsPrevious indicates whether these are logs
+                            from the previous container instance.
+                          type: boolean
+                        lines:
+                          description: Lines holds the individual log lines collected.
+                          items:
+                            type: string
+                          type: array
+                        truncated:
+                          description: Truncated is true when the log was cut short
+                            due to byte or line limits.
+                          type: boolean
+                        unavailableReason:
+                          description: |-
+                            UnavailableReason describes why logs could not be retrieved.
+                            Empty when logs were retrieved successfully.
+                          type: string
+                      required:
+                      - containerName
+                      - isPrevious
+                      - truncated
+                      type: object
+                    type: array
+                  node:
+                    description: Node holds evidence from the node the affected Pod
+                      ran on.
+                    properties:
+                      allocatableCPU:
+                        description: AllocatableCPU is the node's allocatable CPU
+                          in millicores as a string.
+                        type: string
+                      allocatableMemory:
+                        description: AllocatableMemory is the node's allocatable memory
+                          as a human-readable string.
+                        type: string
+                      diskPressure:
+                        description: DiskPressure is the DiskPressure condition status.
+                        type: string
+                      kernelVersion:
+                        description: KernelVersion is the node's kernel version string.
+                        type: string
+                      memoryPressure:
+                        description: MemoryPressure is the MemoryPressure condition
+                          status.
+                        type: string
+                      name:
+                        description: Name is the node name.
+                        type: string
+                      networkUnavailable:
+                        description: NetworkUnavailable is the NetworkUnavailable
+                          condition status.
+                        type: string
+                      pidPressure:
+                        description: PIDPressure is the PIDPressure condition status.
+                        type: string
+                      ready:
+                        description: 'Ready is the node''s Ready condition status:
+                          "True", "False", or "Unknown".'
+                        type: string
+                    required:
+                    - diskPressure
+                    - memoryPressure
+                    - name
+                    - pidPressure
+                    - ready
+                    type: object
+                  pod:
+                    description: Pod holds evidence from the primary affected Pod.
+                    properties:
+                      containers:
+                        description: Containers holds per-container state evidence.
+                        items:
+                          description: ContainerEvidence holds state evidence for
+                            one container.
+                          properties:
+                            exitCode:
+                              description: |-
+                                ExitCode is the exit code from the most recent termination.
+                                Zero when the container has not yet terminated.
+                              format: int32
+                              type: integer
+                            image:
+                              description: Image is the full image reference.
+                              type: string
+                            lastTerminationReason:
+                              description: LastTerminationReason is the reason from
+                                the previous termination, if any.
+                              type: string
+                            livenessProbe:
+                              description: LivenessProbe summarises the liveness probe
+                                configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            name:
+                              description: Name is the container name.
+                              type: string
+                            readinessProbe:
+                              description: ReadinessProbe summarises the readiness
+                                probe configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            resourceLimits:
+                              additionalProperties:
+                                type: string
+                              description: ResourceLimits holds the configured resource
+                                limits for this container.
+                              type: object
+                            resourceRequests:
+                              additionalProperties:
+                                type: string
+                              description: ResourceRequests holds the configured resource
+                                requests for this container.
+                              type: object
+                            restartCount:
+                              description: RestartCount is the number of times the
+                                container has been restarted.
+                              format: int32
+                              type: integer
+                            state:
+                              description: 'State is the current container state:
+                                running, waiting, or terminated.'
+                              type: string
+                            terminationReason:
+                              description: TerminationReason is the reason for the
+                                most recent termination (e.g., OOMKilled, Error).
+                              type: string
+                            waitingReason:
+                              description: WaitingReason is the Waiting.Reason when
+                                state is "waiting".
+                              type: string
+                          required:
+                          - image
+                          - name
+                          - restartCount
+                          - state
+                          type: object
+                        type: array
+                      initContainers:
+                        description: InitContainers holds per-init-container state
+                          evidence.
+                        items:
+                          description: ContainerEvidence holds state evidence for
+                            one container.
+                          properties:
+                            exitCode:
+                              description: |-
+                                ExitCode is the exit code from the most recent termination.
+                                Zero when the container has not yet terminated.
+                              format: int32
+                              type: integer
+                            image:
+                              description: Image is the full image reference.
+                              type: string
+                            lastTerminationReason:
+                              description: LastTerminationReason is the reason from
+                                the previous termination, if any.
+                              type: string
+                            livenessProbe:
+                              description: LivenessProbe summarises the liveness probe
+                                configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            name:
+                              description: Name is the container name.
+                              type: string
+                            readinessProbe:
+                              description: ReadinessProbe summarises the readiness
+                                probe configuration.
+                              properties:
+                                failureThreshold:
+                                  description: FailureThreshold is the number of consecutive
+                                    failures before the probe fails.
+                                  format: int32
+                                  type: integer
+                                httpPath:
+                                  description: HTTPPath is the HTTP GET path when
+                                    Type is HTTPGet.
+                                  type: string
+                                port:
+                                  description: Port is the numeric port for HTTPGet
+                                    or TCPSocket probes.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "HTTPGet", "TCPSocket", or
+                                    "Exec".
+                                  type: string
+                              required:
+                              - failureThreshold
+                              - type
+                              type: object
+                            resourceLimits:
+                              additionalProperties:
+                                type: string
+                              description: ResourceLimits holds the configured resource
+                                limits for this container.
+                              type: object
+                            resourceRequests:
+                              additionalProperties:
+                                type: string
+                              description: ResourceRequests holds the configured resource
+                                requests for this container.
+                              type: object
+                            restartCount:
+                              description: RestartCount is the number of times the
+                                container has been restarted.
+                              format: int32
+                              type: integer
+                            state:
+                              description: 'State is the current container state:
+                                running, waiting, or terminated.'
+                              type: string
+                            terminationReason:
+                              description: TerminationReason is the reason for the
+                                most recent termination (e.g., OOMKilled, Error).
+                              type: string
+                            waitingReason:
+                              description: WaitingReason is the Waiting.Reason when
+                                state is "waiting".
+                              type: string
+                          required:
+                          - image
+                          - name
+                          - restartCount
+                          - state
+                          type: object
+                        type: array
+                      name:
+                        description: Name is the Pod name.
+                        type: string
+                      namespace:
+                        description: Namespace is the Pod namespace.
+                        type: string
+                      nodeName:
+                        description: NodeName is the node the Pod was scheduled on.
+                        type: string
+                      phase:
+                        description: Phase is the Pod phase at collection time.
+                        type: string
+                      volumeMounts:
+                        description: VolumeMounts holds volumes relevant to the trigger
+                          type.
+                        items:
+                          description: VolumeMountEvidence captures a volume mount
+                            relevant to the incident.
+                          properties:
+                            claimName:
+                              description: ClaimName is the PVC name when VolumeType
+                                is PVC.
+                              type: string
+                            mountPath:
+                              description: MountPath is the path inside the container.
+                              type: string
+                            name:
+                              description: Name is the volume name.
+                              type: string
+                            volumeType:
+                              description: VolumeType is the backing volume type (PVC,
+                                ConfigMap, Secret, EmptyDir, etc.).
+                              type: string
+                          required:
+                          - mountPath
+                          - name
+                          - volumeType
+                          type: object
+                        type: array
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                  triggerType:
+                    description: |-
+                      TriggerType is the classified failure signal that initiated this investigation.
+                      Set by the EvidenceOrchestrator from IncidentReport.Status.Trigger.Type so that
+                      diagnosis rules can inspect it without accessing the IncidentReport directly.
+                    type: string
+                  workload:
+                    description: Workload holds evidence from the owning workload
+                      resource.
+                    properties:
+                      conditions:
+                        description: Conditions holds the workload's status conditions
+                          (capped at 10).
+                        items:
+                          description: WorkloadCondition captures one condition from
+                            the workload's status.
+                          properties:
+                            lastTransitionTime:
+                              description: LastTransitionTime is when the condition
+                                last changed.
+                              format: date-time
+                              type: string
+                            message:
+                              description: Message is the human-readable condition
+                                message.
+                              type: string
+                            reason:
+                              description: Reason is the machine-readable reason string.
+                              type: string
+                            status:
+                              description: Status is "True", "False", or "Unknown".
+                              type: string
+                            type:
+                              description: Type is the condition type.
+                              type: string
+                          required:
+                          - status
+                          - type
+                          type: object
+                        type: array
+                      desiredReplicas:
+                        description: DesiredReplicas is the configured replica count.
+                        format: int32
+                        type: integer
+                      kind:
+                        description: Kind is the workload type.
+                        type: string
+                      name:
+                        description: Name is the workload name.
+                        type: string
+                      namespace:
+                        description: Namespace is the workload namespace.
+                        type: string
+                      readyReplicas:
+                        description: ReadyReplicas is the current ready replica count.
+                        format: int32
+                        type: integer
+                      updateStrategy:
+                        description: UpdateStrategy is the update strategy type (e.g.,
+                          RollingUpdate, Recreate, OnDelete).
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    - namespace
+                    type: object
+                type: object
+              failureCount:
+                description: |-
+                  FailureCount tracks the number of distinct failure observations associated with this
+                  incident. For state-based triggers, this increments only when a new unique failure
+                  signature is observed (new container affected, or reoccurrence after recovery).
+                  For event-based triggers, this is set to the current Kubernetes Event.count value.
+                format: int32
+                type: integer
+              lastFailureAt:
+                description: LastFailureAt records the time the most recent failure
+                  was observed.
+                format: date-time
+                type: string
+              phase:
+                description: Phase is the current lifecycle state of the incident.
+                enum:
+                - Investigating
+                - Diagnosed
+                - Unknown
+                - Resolved
+                type: string
+              resolvedAt:
+                description: |-
+                  ResolvedAt is the time the incident was resolved.
+                  Set only when Phase = Resolved.
+                format: date-time
+                type: string
+              stabilityStartedAt:
+                description: |-
+                  StabilityStartedAt records when the workload first became healthy after the incident.
+                  Used to track the stability period without relying on in-memory state.
+                  Reset to nil if a new failure occurs during the stability window.
+                format: date-time
+                type: string
+              startedAt:
+                description: StartedAt is the time the incident was first detected.
+                format: date-time
+                type: string
+              summary:
+                description: |-
+                  Summary is a concise human-readable summary of the incident.
+                  Updated on every reconciliation cycle.
+                type: string
+              timeline:
+                description: |-
+                  Timeline is a chronologically ordered list of significant events during the incident.
+                  Bounded by MaxTimelineEvents. Updated on every reconciliation cycle.
+                items:
+                  description: TimelineEvent represents a single significant moment
+                    during an incident.
+                  properties:
+                    message:
+                      description: Message is the human-readable description, truncated
+                        to 256 characters.
+                      type: string
+                    reason:
+                      description: Reason is the short machine-readable reason string.
+                      type: string
+                    source:
+                      description: |-
+                        Source identifies where the event came from.
+                        "controller" for lifecycle events (IncidentDetected, WorkloadHealthy, IncidentResolved),
+                        "container" for container termination events,
+                        "kubernetes-event" for events from the Kubernetes Events API.
+                      type: string
+                    timestamp:
+                      description: Timestamp is when this event occurred.
+                      format: date-time
+                      type: string
+                  required:
+                  - message
+                  - reason
+                  - source
+                  - timestamp
+                  type: object
+                type: array
+              trigger:
+                description: Trigger is the primary failure signal that created the
+                  incident.
+                properties:
+                  containerName:
+                    description: ContainerName is the container that triggered the
+                      incident, if applicable.
+                    type: string
+                  message:
+                    description: Message is a short human-readable description of
+                      the failure signal.
+                    type: string
+                  observedAt:
+                    description: ObservedAt is the time at which this trigger was
+                      first observed.
+                    format: date-time
+                    type: string
+                  reason:
+                    description: Reason is the raw Kubernetes reason string from the
+                      Pod or Event, if available.
+                    type: string
+                  type:
+                    description: Type is the classified trigger type.
+                    type: string
+                required:
+                - type
+                type: object
+              workloadOwnerResolved:
+                description: |-
+                  WorkloadOwnerResolved indicates whether workload ownership was successfully determined.
+                  False means the incident is tracked at Pod level (see AffectedPods).
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

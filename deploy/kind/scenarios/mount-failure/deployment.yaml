@@ -1,0 +1,38 @@
+# MountFailure scenario: mounts a PVC that will never bind.
+# The Pod stays in ContainerCreating and Kubernetes emits FailedMount events.
+# The investigator diagnoses this as PVCNotBound (High confidence).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mount-fail-app
+  namespace: demo-mount-failure
+  labels:
+    app: mount-fail-app
+    demo: incident-investigator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mount-fail-app
+  template:
+    metadata:
+      labels:
+        app: mount-fail-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:alpine
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: demo-data

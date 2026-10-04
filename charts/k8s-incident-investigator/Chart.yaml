@@ -1,0 +1,26 @@
+apiVersion: v2
+name: k8s-incident-investigator
+description: Kubernetes-native automated workload failure investigation controller.
+  Detects failures, collects evidence, and produces structured IncidentReport CRDs
+  with diagnoses and recommendations — viewable with kubectl.
+type: application
+version: 0.1.0
+appVersion: "v0.1.0"
+keywords:
+  - kubernetes
+  - incident
+  - troubleshooting
+  - observability
+  - operator
+  - controller
+sources:
+  - https://github.com/karangupta982/k8s-incident-investigator
+maintainers:
+  - name: Karan Gupta
+    url: https://github.com/karangupta982
+home: https://github.com/karangupta982/k8s-incident-investigator
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/signKey: |
+    fingerprint: ""
+    url: ""

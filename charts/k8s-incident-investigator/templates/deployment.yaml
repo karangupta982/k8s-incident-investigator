@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-incident-investigator.fullname" . }}-controller-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-incident-investigator.labels" . | nindent 4 }}
+    control-plane: controller-manager
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k8s-incident-investigator.selectorLabels" . | nindent 6 }}
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-incident-investigator.selectorLabels" . | nindent 8 }}
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: {{ include "k8s-incident-investigator.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: manager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        {{- if .Values.leaderElection.enabled }}
+        - --leader-elect
+        {{- end }}
+        - --stability-period={{ .Values.stabilityPeriod }}
+        - --requeue-interval={{ .Values.requeueInterval }}
+        - --readiness-threshold={{ .Values.thresholds.readinessProbe }}
+        - --liveness-threshold={{ .Values.thresholds.livenessProbe }}
+        - --mount-threshold={{ .Values.thresholds.mountFailure }}
+        - --scheduling-threshold={{ .Values.thresholds.schedulingFailure }}
+        - --max-log-bytes={{ .Values.evidence.maxLogBytes }}
+        - --max-log-lines={{ .Values.evidence.maxLogLines }}
+        - --max-events={{ .Values.evidence.maxEvents }}
+        - --evidence-timeout={{ .Values.evidence.collectionTimeout }}
+        - --timeline-events={{ .Values.maxTimelineEvents }}
+        {{- if .Values.watchNamespaces }}
+        - --watch-namespaces={{ .Values.watchNamespaces }}
+        {{- end }}
+        - --metrics-bind-address=:{{ .Values.metrics.port }}
+        - --health-probe-bind-address=:{{ .Values.healthProbe.port }}
+        ports:
+        - name: metrics
+          containerPort: {{ .Values.metrics.port }}
+          protocol: TCP
+        - name: health
+          containerPort: {{ .Values.healthProbe.port }}
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ .Values.healthProbe.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: {{ .Values.healthProbe.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
