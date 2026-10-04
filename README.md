@@ -1,194 +1,272 @@
-# Kubernetes Incident Investigator
+<div align="center">
 
-A Kubernetes-native controller that automatically detects workload failures, creates persistent `IncidentReport` resources, and provides engineers with structured incident records — without manual `kubectl` investigation.
+# ⚡ Kubernetes Incident Investigator
 
-When a workload fails, instead of running a dozen commands to figure out what happened, you inspect one resource:
+**Automated workload failure detection, evidence collection, and diagnosis — entirely Kubernetes-native.**
 
-```
+[![CI](https://github.com/karangupta982/k8s-incident-investigator/actions/workflows/ci.yml/badge.svg)](https://github.com/karangupta982/k8s-incident-investigator/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8.svg)](go.mod)
+
+</div>
+
+---
+
+When a Kubernetes workload fails, engineers typically run a dozen commands to figure out what happened — `kubectl describe pod`, `kubectl logs`, `kubectl get events`, `kubectl describe node`, and so on. Connecting the pieces together is the hard part.
+
+The Incident Investigator automates that entire process. When a failure is detected, it creates a persistent `IncidentReport` custom resource, collects relevant evidence from multiple Kubernetes sources, correlates the evidence, runs deterministic diagnosis rules, and presents a structured investigation report you can inspect with standard kubectl commands.
+
+```bash
 kubectl get incidentreports -A
-kubectl describe incidentreport payment-api-deployment-active
+kubectl describe incidentreport payment-api-deployment-active -n production
+```
+
+No dashboards. No agents. No external services. It installs into your cluster as a single controller and runs entirely within Kubernetes.
+
+---
+
+## Install
+
+> **Helm chart coming in v0.1.0.** Until then, use the Kustomize manifests below.
+
+```bash
+# Install CRDs
+kubectl apply -f https://raw.githubusercontent.com/karangupta982/k8s-incident-investigator/main/config/crd/bases/investigation.k8s.io_incidentreports.yaml
+
+# Install controller
+kubectl apply -k https://github.com/karangupta982/k8s-incident-investigator/config/default
+```
+
+Or clone and install locally:
+
+```bash
+git clone https://github.com/karangupta982/k8s-incident-investigator
+cd k8s-incident-investigator
+kubectl apply -k config/default
+```
+
+**Uninstall:**
+
+```bash
+kubectl delete -k config/default
+kubectl delete -f config/crd/bases/investigation.k8s.io_incidentreports.yaml
 ```
 
 ---
 
-## How it works
+## What it detects
 
-The controller watches Pods and Kubernetes Events for meaningful failure signals. When a threshold is crossed it creates an `IncidentReport` CR, tracks affected Pods, evaluates workload health, and marks the incident resolved after the configured stability period elapses.
+| Trigger | Detection method | Example |
+|---------|-----------------|---------|
+| OOMKilled | Pod container status (immediate) | Container hit memory limit |
+| CrashLoopBackOff | Pod container status (immediate) | App crashing on startup |
+| ImagePullBackOff | Pod container status (immediate) | Invalid image tag or missing pull secret |
+| CreateContainerConfigError | Pod container status (immediate) | Missing ConfigMap or Secret |
+| Eviction | Pod status (immediate) | Node evicted the Pod |
+| Readiness probe failures | Kubernetes Event.count ≥ threshold | App health check failing |
+| Liveness probe failures | Kubernetes Event.count ≥ threshold | App unresponsive |
+| Volume mount failures | Kubernetes Event.count ≥ threshold | PVC not bound, CSI error |
+| Scheduling failures | Kubernetes Event.count ≥ threshold | Insufficient CPU/memory, no matching node |
 
-Detected failure signals:
+---
 
-| Signal | Detection method |
-|--------|-----------------|
-| OOMKilled | Pod container status (immediate) |
-| CrashLoopBackOff | Pod container status (immediate) |
-| ImagePullBackOff / ErrImagePull | Pod container status (immediate) |
-| CreateContainerConfigError | Pod container status (immediate) |
-| Pod eviction | Pod status (immediate) |
-| Readiness probe failures | Kubernetes Event.count ≥ threshold |
-| Liveness probe failures | Kubernetes Event.count ≥ threshold |
-| Mount failures | Kubernetes Event.count ≥ threshold |
-| Scheduling failures | Kubernetes Event.count ≥ threshold |
+## What you get
+
+After a failure is detected and investigated, `kubectl describe incidentreport` shows:
+
+```
+Phase:   Diagnosed
+
+Summary:
+  Workload: Deployment/production/payment-api
+  Phase: Diagnosed (Confidence: High)
+  Cause: Container exceeded its configured memory limit
+  Trigger: OOMKilled
+  Affected Pods: 1
+  Started: 2026-01-01T14:02:00Z
+
+Diagnosis:
+  Primary:
+    Rule ID:    OOMMemoryLimit
+    Confidence: High
+    Cause:      Container exceeded its configured memory limit
+    Explanation: Container "app" was terminated with OOMKilled (exit code 137).
+                 The container has a memory limit of 512Mi configured.
+                 The node did not report MemoryPressure, indicating the OOM kill
+                 was caused by the container exceeding its own limit.
+    Supporting Evidence:
+      - termination reason: OOMKilled
+      - exit code: 137
+      - memory limit: 512Mi
+      - node did not report MemoryPressure
+    Recommendation:
+      Container "app" was OOMKilled with a memory limit of 512Mi.
+      Investigate application memory consumption and consider increasing
+      the memory limit if the workload legitimately requires more memory.
+
+Timeline:
+  14:02:00  IncidentDetected  Incident detected and IncidentReport created.
+  14:02:08  OOMKilled         Container "app" terminated (exit 137, restart 1).
+  14:02:09  Unhealthy         Readiness probe failed after restart.
+
+Affected Pods:
+  payment-api-abc123 (default)
+
+Evidence:
+  Pod:
+    Container: app
+      State:             waiting (CrashLoopBackOff)
+      Last Termination:  OOMKilled (exit 137)
+      Restart Count:     3
+      Memory Limit:      512Mi
+  Node:
+    Name:            ip-10-0-1-23
+    Memory Pressure: False
+    Allocatable Mem: 7640Mi
+```
+
+---
+
+## Investigation pipeline
+
+The controller runs each reconcile cycle through a sequential pipeline:
+
+```
+Failure signal (Pod state or Event count)
+    ↓
+Trigger evaluation
+    ↓
+Workload ownership resolution (Pod → RS → Deployment / StatefulSet / DaemonSet / Job / CronJob)
+    ↓
+Incident correlation (deterministic naming, one active incident per workload)
+    ↓
+Evidence collection (Pod, Events, Logs, Node, Workload, Dependencies)
+    ↓
+Evidence correlation (causal signals, log patterns, chain patterns)
+    ↓
+Diagnosis engine (10 rules, High/Medium/Low confidence)
+    ↓
+Reporting (Summary, Timeline, enriched Recommendations)
+    ↓
+Recovery detection (workload-type-aware stability period)
+    ↓
+IncidentReport → Resolved → Historical record preserved
+```
+
+See [docs/architecture.html](docs/architecture.html) for an interactive architecture diagram.
+
+---
+
+## Diagnosis rules
+
+The engine evaluates 10 deterministic rules. No LLM required — every finding is traceable to specific evidence.
+
+| Rule | Confidence | Fires when |
+|------|------------|------------|
+| `OOMMemoryLimit` | High | OOMKilled + exit 137 + memory limit + no node pressure |
+| `NodeMemoryPressure` | Medium | Node MemoryPressure=True + OOM/eviction signal |
+| `CrashLoopOOMExit` | High | CrashLoopBackOff + exit 137 |
+| `CrashLoopAppError` | Medium | CrashLoopBackOff + non-OOM exit code |
+| `ImagePullFailure` | High | ImagePullBackOff or ErrImagePull waiting state |
+| `MissingConfigReference` | High | CreateContainerConfigError waiting state |
+| `PVCNotBound` | High | MountFailure + PVC phase ≠ Bound |
+| `PVCMountError` | Medium | MountFailure + PVC Bound + FailedMount events |
+| `SchedulingFailure` | High | SchedulingFailure + FailedScheduling events |
+| `ProbeFailure` | Medium | Readiness/Liveness failure + Unhealthy events |
+
+When no rule matches, the phase becomes `Unknown` with an explanation — the system never fabricates a root cause.
+
+---
+
+## Configuration
+
+All flags are optional with sensible defaults.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--stability-period` | `5m` | How long a workload must remain healthy before resolving an incident |
+| `--requeue-interval` | `30s` | How often active incidents are re-evaluated |
+| `--readiness-threshold` | `3` | Event.count threshold for readiness probe failures |
+| `--liveness-threshold` | `3` | Event.count threshold for liveness probe failures |
+| `--mount-threshold` | `3` | Event.count threshold for mount failures |
+| `--scheduling-threshold` | `5` | Event.count threshold for scheduling failures |
+| `--max-log-bytes` | `32768` | Maximum bytes per container log excerpt |
+| `--max-log-lines` | `200` | Maximum lines per container log excerpt |
+| `--max-events` | `25` | Maximum Kubernetes Events stored per incident |
+| `--timeline-events` | `50` | Maximum events in the incident timeline |
+| `--watch-namespaces` | `""` | Comma-separated namespaces to watch (empty = all) |
+| `--leader-elect` | `false` | Enable leader election for HA deployments |
 
 ---
 
 ## Prerequisites
 
-- Go 1.23+
-- kubectl
-- Docker
-- [Kind](https://kind.sigs.k8s.io/) (for local demo)
-- [controller-gen](https://book.kubebuilder.io/reference/controller-gen) (installed automatically by `make`)
+- Kubernetes 1.28+
+- `kubectl`
+
+The controller requires read-only access to: Pods, Events, Nodes, ReplicaSets, Deployments, StatefulSets, DaemonSets, Jobs, CronJobs, PersistentVolumeClaims, PersistentVolumes, StorageClasses, and `pods/log`. It requires read-write access to `IncidentReport` custom resources only. It never modifies any workload resource.
 
 ---
 
-## Quick start — local Kind cluster
+## Local development with Kind
 
 ```bash
-# 1. Clone and enter the repo
-git clone https://github.com/k8s-incident-investigator/k8s-incident-investigator
-cd k8s-incident-investigator
-
-# 2. Create the Kind cluster, build the image, and deploy the controller
+# Create a Kind cluster and deploy the controller
 ./deploy/kind/setup.sh
 
-# 3. Deploy a workload that will OOMKill
-kubectl apply -f deploy/kind/test-workload/oom-crasher.yaml
+# Run a demo scenario (OOMKilled)
+./deploy/kind/demo.sh oom-killed
 
-# 4. Watch for the IncidentReport to appear (takes ~30s)
-kubectl get incidentreports -n demo -w
-
-# 5. Inspect the incident
-kubectl describe incidentreport -n demo $(kubectl get ir -n demo -o jsonpath='{.items[0].metadata.name}')
+# Run all 6 demo scenarios
+./deploy/kind/demo.sh --all
 ```
 
-To run the full e2e validation (takes ~7 minutes due to the stability period):
+Available scenarios: `oom-killed`, `crash-loop`, `image-pull-backoff`, `mount-failure`, `scheduling-failure`, `readiness-probe-failure`.
 
-```bash
-./deploy/kind/validate.sh
-```
-
----
-
-## Inspecting incidents
-
-```bash
-# List all incidents across all namespaces
-kubectl get incidentreports -A
-
-# List incidents for a specific namespace
-kubectl get incidentreports -n production
-
-# Describe a specific incident
-kubectl describe incidentreport payment-api-deployment-active -n production
-
-# List only active incidents (not yet resolved)
-kubectl get incidentreports -A -l investigator.k8s.io/active=true
-
-# List resolved historical incidents
-kubectl get incidentreports -A | grep -v active
-```
-
-Example output:
-
-```
-NAME                                    WORKLOAD       KIND         PHASE          TRIGGER        STARTED
-payment-api-deployment-active           payment-api    Deployment   Investigating  OOMKilled      5m ago
-worker-deployment-20260829-a3f2b        worker         Deployment   Resolved       MountFailure   2d ago
-```
-
----
-
-## Configuration reference
-
-All flags have sensible defaults and are optional.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--stability-period` | `5m` | How long a workload must remain healthy before resolving an incident |
-| `--correlation-window` | `10m` | Reserved for future cross-incident correlation |
-| `--readiness-threshold` | `3` | Readiness probe failure Event.count to trigger incident |
-| `--liveness-threshold` | `3` | Liveness probe failure Event.count to trigger incident |
-| `--mount-threshold` | `3` | Mount failure Event.count to trigger incident |
-| `--scheduling-threshold` | `5` | Scheduling failure Event.count to trigger incident |
-| `--requeue-interval` | `30s` | How often active incidents are re-evaluated |
-| `--watch-namespaces` | `""` | Comma-separated namespaces to watch (empty = all) |
-| `--leader-elect` | `false` | Enable leader election for HA deployments |
-| `--metrics-bind-address` | `:8080` | Metrics endpoint address |
-| `--health-probe-bind-address` | `:8081` | Health probe endpoint address |
+See [deploy/kind/scenarios/](deploy/kind/scenarios/) for details on each scenario and [docs/demo/scenarios.md](docs/demo/scenarios.md) for annotated expected output.
 
 ---
 
 ## Development
 
-### Running tests
-
 ```bash
-# Unit tests (fast, no cluster needed)
+# Run unit tests
 make test-unit
 
-# Integration tests (requires envtest binaries)
+# Run integration tests (requires envtest)
 make test-integration
 
-# All tests
-make test
-```
+# Regenerate CRD and RBAC manifests after API changes
+make generate manifests
 
-### Code generation
-
-Run after changing API types in `api/v1alpha1/`:
-
-```bash
-# Regenerate DeepCopy methods
-make generate
-
-# Regenerate CRD manifests and RBAC from markers
-make manifests
-```
-
-### Building
-
-```bash
-# Build the manager binary
+# Build binary
 make build
 
-# Build the Docker image
-make docker-build IMG=my-registry/incident-investigator:latest
-
-# Push the Docker image
-make docker-push IMG=my-registry/incident-investigator:latest
+# Build Docker image
+make docker-build IMG=my-registry/k8s-incident-investigator:dev
 ```
 
-### Project structure
-
-```
-api/v1alpha1/           CRD type definitions (IncidentReport)
-cmd/                    Controller manager entrypoint
-internal/
-  config/               Configuration and defaults
-  controller/           PodReconciler — thin orchestration layer
-  investigation/        Domain logic: trigger, ownership, correlation, recovery
-config/
-  crd/                  Generated CRD manifests
-  rbac/                 Generated and static RBAC manifests
-  manager/              Deployment manifests
-  samples/              Example IncidentReport
-deploy/kind/            Local Kind cluster setup and e2e validation
-test/
-  unit/                 Unit tests (table-driven + property-based)
-  integration/          Envtest integration tests
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guide.
 
 ---
 
-## Design decisions
+## Observability
 
-The investigator is read-only by design — it observes and reports but never modifies the workload being investigated. RBAC is scoped to the minimum required for investigation.
+The controller exposes 10 Prometheus metrics at `/metrics`:
 
-Key design choices:
+- `investigator_incidents_detected_total`
+- `investigator_investigations_completed_total`
+- `investigator_diagnosed_total`
+- `investigator_unknown_diagnoses_total`
+- `investigator_active_incidents`
+- `investigator_reconciliation_errors_total`
+- `investigator_evidence_collection_failures_total`
+- `investigator_investigation_duration_seconds`
+- `investigator_evidence_collection_duration_seconds`
+- `investigator_diagnosis_rule_matches_total`
 
-- **Deterministic naming**: active incidents use `<workload>-<kind>-active` names, preventing duplicates even under concurrent reconciliation
-- **Two-name model**: resolved incidents are copied to a historical name before the active slot is freed, preserving history while allowing new incidents for the same workload
-- **Workload-aware recovery**: uses Deployment/StatefulSet/DaemonSet replica counts rather than raw Pod readiness, handling rolling updates and scale operations correctly
-- **Evidence-first**: the foundation gathers structured incident state; diagnosis and recommendations are added in subsequent specifications
+---
 
-For architecture details see the spec documents in `.kiro/specs/incident-investigator-foundation/`.
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).

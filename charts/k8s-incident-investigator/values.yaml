@@ -1,0 +1,80 @@
+# Default values for k8s-incident-investigator.
+
+image:
+  repository: ghcr.io/karangupta982/k8s-incident-investigator
+  tag: ""  # defaults to Chart.appVersion
+  pullPolicy: IfNotPresent
+
+# Number of controller replicas. Use 1 with leaderElection.enabled=true for HA.
+replicaCount: 1
+
+# Leader election — recommended for production deployments.
+leaderElection:
+  enabled: true
+
+# Namespace scope — empty means all namespaces.
+watchNamespaces: ""
+
+# Stability period before resolving an incident.
+stabilityPeriod: "5m"
+
+# How often active incidents are re-evaluated.
+requeueInterval: "30s"
+
+# Failure threshold configuration (Event.count).
+thresholds:
+  readinessProbe: 3
+  livenessProbe: 3
+  mountFailure: 3
+  schedulingFailure: 5
+
+# Evidence collection limits.
+evidence:
+  maxLogBytes: 32768
+  maxLogLines: 200
+  maxEvents: 25
+  collectionTimeout: "30s"
+
+# Timeline events limit.
+maxTimelineEvents: 50
+
+# Resource requests and limits for the controller container.
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Metrics endpoint.
+metrics:
+  enabled: true
+  port: 8080
+
+# Health probe endpoint.
+healthProbe:
+  port: 8081
+
+# Security context for the controller pod.
+podSecurityContext:
+  runAsNonRoot: true
+
+# Security context for the controller container.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Node selector, tolerations, and affinity.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ServiceAccount configuration.
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}

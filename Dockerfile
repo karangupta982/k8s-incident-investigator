@@ -1,9 +1,12 @@
-# Stage 1: Build
-FROM golang:1.23-alpine AS builder
+# Stage 1: Build — use buildx ARG for multi-architecture support
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /workspace
 
-# Copy go module files first for layer caching
+# Copy module files first for layer caching
 COPY go.mod go.mod
 COPY go.sum go.sum
 RUN go mod download
@@ -13,9 +16,9 @@ COPY api/ api/
 COPY cmd/ cmd/
 COPY internal/ internal/
 
-# Build the manager binary
-# CGO_ENABLED=0 for static binary, GOOS=linux for Linux target
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager ./cmd
+# Build for the target platform
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -a -ldflags="-s -w" -o manager ./cmd
 
 # Stage 2: Runtime — minimal distroless image
 FROM gcr.io/distroless/static:nonroot

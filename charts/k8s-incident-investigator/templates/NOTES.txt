@@ -1,0 +1,17 @@
+Thank you for installing {{ .Chart.Name }} v{{ .Chart.AppVersion }}.
+
+The controller is starting in namespace {{ .Release.Namespace }}.
+
+Verify it's running:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+Watch for incident reports across all namespaces:
+  kubectl get incidentreports -A
+
+Inspect a specific incident:
+  kubectl describe incidentreport <name> -n <namespace>
+
+For local demo scenarios (requires Kind):
+  ./deploy/kind/demo.sh oom-killed
+
+Documentation: https://github.com/karangupta982/k8s-incident-investigator

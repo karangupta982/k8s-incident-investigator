@@ -116,7 +116,7 @@ type IncidentReportStatus struct {
 //
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:annotations=`api-approved.kubernetes.io=unapproved, is a demo project for local development`
+// +kubebuilder:metadata:annotations=`api-approved.kubernetes.io=unapproved, awaiting upstream approval; see https://github.com/kubernetes/enhancements/pull/1111`
 // +kubebuilder:resource:shortName=ir,categories=investigator
 // +kubebuilder:printcolumn:name="Workload",type=string,JSONPath=".spec.workload.name"
 // +kubebuilder:printcolumn:name="Kind",type=string,JSONPath=".spec.workload.kind"
