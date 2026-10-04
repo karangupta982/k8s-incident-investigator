@@ -68,7 +68,7 @@ func TestLogCollector_MaxLogLines_Zero(t *testing.T) {
 		currentLogs:  true,
 		previousLogs: true,
 	})
-	
+
 	if len(fakeClient.Actions()) != 0 {
 		t.Fatalf("expected no Kubernetes API actions when MaxLogLines=0, got %v", fakeClient.Actions())
 	}
