@@ -39,6 +39,10 @@ func (c *LogCollector) Collect(ctx context.Context, input CollectorInput, needs 
 	if !needs.currentLogs && !needs.previousLogs {
 		return nil, nil
 	}
+	// MaxLogLines == 0 means log collection is disabled — skip entirely, no API call.
+	if input.Config.MaxLogLines == 0 {
+		return nil, nil
+	}
 
 	// Determine which containers to collect logs from.
 	var containerNames []string
